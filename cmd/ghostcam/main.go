@@ -22,12 +22,12 @@ import (
 
 	qrcode "github.com/skip2/go-qrcode"
 
-	"github.com/p3374/GhostCam/internal/server"
-	"github.com/p3374/GhostCam/internal/tunnel"
-	"github.com/p3374/GhostCam/internal/upnp"
-	"github.com/p3374/GhostCam/web"
+	"ghostcam/internal/server"
+	"ghostcam/internal/tunnel"
+	"ghostcam/internal/upnp"
+	"ghostcam/web"
 
-	ghostcam "github.com/p3374/GhostCam"
+	ghostcam "ghostcam"
 )
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 		PublicAddr: *listen, AdminAddr: *admin, RTCPort: *rtcPort,
 		Settings: settings, SettingsPath: settingsPath,
 		ICEServers: ice, Web: assets, OpenDir: openPath, PickDir: pickDir,
-		Notices: ghostcam.Notices(),
+		Notices: ghostcam.Notices(), SourceURL: ghostcam.Repo,
 	})
 	if err != nil {
 		log.Fatal(err)

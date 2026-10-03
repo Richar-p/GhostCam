@@ -1,4 +1,4 @@
-module github.com/p3374/GhostCam
+module ghostcam
 
 go 1.24.0
 

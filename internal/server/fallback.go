@@ -13,7 +13,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/p3374/GhostCam/internal/record"
+	"ghostcam/internal/record"
 )
 
 var allowedMimes = map[string]string{

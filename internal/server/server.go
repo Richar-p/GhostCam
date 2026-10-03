@@ -30,9 +30,9 @@ import (
 	"github.com/pion/webrtc/v4"
 	qrcode "github.com/skip2/go-qrcode"
 
-	"github.com/p3374/GhostCam/internal/pairing"
-	"github.com/p3374/GhostCam/internal/record"
-	"github.com/p3374/GhostCam/internal/upnp"
+	"ghostcam/internal/pairing"
+	"ghostcam/internal/record"
+	"ghostcam/internal/upnp"
 )
 
 type ICEServer struct {
@@ -52,6 +52,7 @@ type Config struct {
 	OpenDir      func(dir string) error             // reveal recordings in the OS file manager
 	PickDir      func(start string) (string, error) // native folder picker (nil if none)
 	Notices      string                             // license texts shown at /licenses
+	SourceURL    string                             // public source repository (AGPL: source offer)
 }
 
 type session struct {
@@ -370,7 +371,7 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 		}
 		targets := map[string]string{
 			"licenses": "http://" + r.Host + "/licenses",
-			"source":   "https://github.com/p3374/GhostCam",
+			"source":   s.cfg.SourceURL,
 		}
 		u, ok := targets[r.PathValue("what")]
 		if !ok {

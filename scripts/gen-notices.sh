@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-GOOS=windows go-licenses save ./cmd/ghostcam --save_path="$tmp/l" --ignore github.com/p3374/GhostCam 2>/dev/null
+GOOS=windows go-licenses save ./cmd/ghostcam --save_path="$tmp/l" --ignore ghostcam 2>/dev/null
 
 {
   echo "==== Third-party licenses ===="

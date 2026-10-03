@@ -13,7 +13,10 @@ var license string
 //go:embed third_party_licenses.txt
 var thirdParty string
 
-const header = `GhostCam — https://github.com/p3374/GhostCam
+// Repo is the public source repository: the only place it is defined in code.
+const Repo = "https://github.com/p3374/GhostCam"
+
+const header = `GhostCam — ` + Repo + `
 Copyright (C) the GhostCam contributors
 
 This program is free software: you can redistribute it and/or modify it under

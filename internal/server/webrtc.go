@@ -21,7 +21,7 @@ import (
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v4"
 
-	"github.com/p3374/GhostCam/internal/record"
+	"ghostcam/internal/record"
 )
 
 func newWebRTCAPI(rtcPort int) (*webrtc.API, error) {
