@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2a30"/>
+      <stop offset="1" stop-color="#0b0b0d"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <!-- ghost -->
+  <path d="M60 132a68 68 0 0 1 136 0v80l-22.7-17-22.6 17-22.7-17-22.7 17-22.6-17L60 212z"
+        fill="#f4f4f5" stroke="#f4f4f5" stroke-width="10" stroke-linejoin="round"/>
+  <ellipse cx="104" cy="134" rx="11" ry="15" fill="#0b0b0d"/>
+  <ellipse cx="152" cy="134" rx="11" ry="15" fill="#0b0b0d"/>
+  <!-- record dot -->
+  <circle cx="190" cy="70" r="30" fill="#ef4444" stroke="#18181b" stroke-width="10"/>
+</svg>

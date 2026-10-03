@@ -1,0 +1,62 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#000000">
+<title>GhostCam</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; font: 15px/1.4 system-ui, -apple-system, sans-serif; overflow: hidden; }
+  video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .top { position: fixed; top: 0; left: 0; right: 0; padding: calc(12px + env(safe-area-inset-top)) 16px 24px;
+         background: linear-gradient(rgba(0,0,0,.6), transparent); display: flex; justify-content: center; }
+  #conn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; background: rgba(0,0,0,.5);
+          backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 13px; }
+  #conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #a1a1aa; }
+  #conn.ok::before { background: #22c55e; }
+  #conn.warn::before { background: #f59e0b; }
+  #timer { position: fixed; top: calc(56px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center;
+           font: 600 22px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+  #timer::before { content: "● "; color: #ef4444; }
+  .bottom { position: fixed; left: 0; right: 0; bottom: 0; padding: 32px 16px calc(24px + env(safe-area-inset-bottom));
+            background: linear-gradient(transparent, rgba(0,0,0,.7)); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  #rec { width: 78px; height: 78px; border-radius: 50%; border: 4px solid #fff; background: transparent; padding: 0; display: grid; place-items: center; cursor: pointer; }
+  #rec::after { content: ""; width: 62px; height: 62px; border-radius: 50%; background: #ef4444; transition: all .2s ease; }
+  #rec.on::after { width: 30px; height: 30px; border-radius: 6px; }
+  #rec:disabled { opacity: .35; }
+  #info { font-size: 13px; color: rgba(255,255,255,.85); text-align: center; min-height: 18px; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(150px + env(safe-area-inset-bottom)); text-align: center; pointer-events: none;
+           opacity: 0; transition: opacity .3s; }
+  #toast span { display: inline-block; background: rgba(0,0,0,.75); padding: 10px 14px; border-radius: 12px; font-size: 14px; }
+  #toast.show { opacity: 1; }
+  #intro { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px;
+           padding: 24px; text-align: center; background: #0b0b0c; }
+  #intro h1 { margin: 0; font-size: 22px; }
+  #intro p { margin: 0; color: #a1a1aa; max-width: 320px; }
+  #go { font: inherit; font-weight: 600; font-size: 17px; padding: 14px 28px; border: 0; border-radius: 14px; background: #fff; color: #000; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<video id="preview" autoplay playsinline muted></video>
+<div class="top"><span id="conn">Hors ligne</span></div>
+<div id="timer" hidden>00:00</div>
+<div id="toast"><span id="toast-text"></span></div>
+<div class="bottom">
+  <button id="rec" aria-label="Démarrer l'enregistrement" disabled></button>
+  <div id="info"></div>
+</div>
+<section id="intro">
+  <img src="/icon.svg" width="72" height="72" alt="">
+  <h1>GhostCam</h1>
+  <p id="intro-text">La vidéo est envoyée en direct sur votre PC et n'est jamais stockée sur ce téléphone.</p>
+  <button id="go">Activer la caméra</button>
+</section>
+<script src="/app.js"></script>
+</body>
+</html>

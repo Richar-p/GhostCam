@@ -1,0 +1,73 @@
+services:
+  # docker compose up dev  -> app in a container, QR code printed in the logs,
+  # admin UI on http://localhost:8081. Inside Docker, UPnP and direct WebRTC
+  # are limited by Docker's NAT; the encrypted WebSocket relay always works.
+  dev:
+    build: { context: ., target: dev }
+    volumes:
+      - .:/src
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+    ports:
+      - "127.0.0.1:8081:8081"
+      - "50000:50000/udp"
+
+  # docker compose run --rm build-windows  -> dist/ghostcam.exe (single file: cloudflared is
+  # downloaded at first launch, license texts are embedded and shown in the app)
+  build-windows:
+    build: { context: ., target: release }
+    profiles: ["build"]
+    environment:
+      GOOS: windows
+      GOARCH: amd64
+    volumes:
+      - .:/src
+      - ./dist:/out
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+    command:
+      - sh
+      - -c
+      - >
+        sh scripts/gen-notices.sh &&
+        go build -trimpath -ldflags='-s -w -H=windowsgui' -o /out/ghostcam.exe ./cmd/ghostcam &&
+        rm -rf /out/cloudflared.exe /out/LICENSE.txt /out/licenses &&
+        ls -lh /out/ghostcam.exe
+
+  # docker compose run --rm build-linux && MODE=webrtc|relay docker compose run --rm e2e
+  build-linux:
+    build: { context: ., target: base }
+    profiles: ["test"]
+    volumes:
+      - .:/src
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+    command: go build -o dist/ghostcam-linux ./cmd/ghostcam
+
+  e2e:
+    build: { context: ., target: e2e }
+    profiles: ["test"]
+    environment:
+      MODE: ${MODE:-webrtc}
+    volumes:
+      - .:/src
+    command: sh -c "cp /src/test/e2e/run.mjs /e2e/ && node /e2e/run.mjs"
+
+  # docker compose run --rm icons  -> regenerate icons from web/icon.svg
+  icons:
+    build: { context: ., target: icons }
+    profiles: ["build"]
+    volumes:
+      - .:/src
+    command:
+      - sh
+      - -c
+      - >
+        rsvg-convert -w 256 -h 256 web/icon.svg -o cmd/ghostcam/winres/icon.png &&
+        rsvg-convert -w 180 -h 180 web/icon.svg -o web/icon.png &&
+        cd cmd/ghostcam && go-winres make --arch amd64,arm64 &&
+        ls -l rsrc_windows_*.syso
+
+volumes:
+  gomod:
+  gocache:
