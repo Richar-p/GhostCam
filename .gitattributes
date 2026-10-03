@@ -1,0 +1,12 @@
+# Normalize text files to LF in the repository.
+* text=auto
+
+# Scripts and Docker files run inside Linux containers: keep LF on checkout,
+# even on Windows with core.autocrlf=true (CRLF breaks "set -eu").
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+
+# Binary build inputs.
+*.syso binary
+*.png binary
