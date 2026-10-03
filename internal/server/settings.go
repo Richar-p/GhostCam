@@ -5,10 +5,10 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 // Quality is sent to the phone, which applies it at the start of each video
@@ -16,8 +16,7 @@ import (
 // must sustain: above it, WebRTC degrades the picture and the relay queues
 // data on the phone (= seconds not yet safe on the PC).
 type Quality struct {
-	ID      string `json:"id"`
-	Label   string `json:"label"`
+	ID      string `json:"id"` // label and description: pc.quality.<id>.* in web/locales
 	Width   int    `json:"width"`
 	Height  int    `json:"height"`
 	FPS     int    `json:"fps"`
@@ -25,10 +24,10 @@ type Quality struct {
 }
 
 var qualities = []Quality{
-	{ID: "eco", Label: "Économie", Width: 854, Height: 480, FPS: 24, Bitrate: 800_000},
-	{ID: "standard", Label: "Standard", Width: 1280, Height: 720, FPS: 30, Bitrate: 2_000_000},
-	{ID: "high", Label: "Haute", Width: 1920, Height: 1080, FPS: 30, Bitrate: 4_000_000},
-	{ID: "max", Label: "Maximale", Width: 1920, Height: 1080, FPS: 30, Bitrate: 8_000_000},
+	{ID: "eco", Width: 854, Height: 480, FPS: 24, Bitrate: 800_000},
+	{ID: "standard", Width: 1280, Height: 720, FPS: 30, Bitrate: 2_000_000},
+	{ID: "high", Width: 1920, Height: 1080, FPS: 30, Bitrate: 4_000_000},
+	{ID: "max", Width: 1920, Height: 1080, FPS: 30, Bitrate: 8_000_000},
 }
 
 const defaultQuality = "standard"
@@ -43,8 +42,9 @@ func qualityByID(id string) (Quality, bool) {
 }
 
 type Settings struct {
-	Quality string `json:"quality"`
-	OutDir  string `json:"outDir"`
+	Quality  string `json:"quality"`
+	OutDir   string `json:"outDir"`
+	Language string `json:"language"` // PC window language; "" = follow Windows
 }
 
 // LoadSettings reads the settings file; missing or invalid values fall back to def.
@@ -81,14 +81,17 @@ func (s *Server) quality() Quality {
 // updateSettings validates, applies (from the next video on) and persists.
 func (s *Server) updateSettings(n Settings) error {
 	if _, ok := qualityByID(n.Quality); !ok {
-		return errors.New("qualité inconnue")
+		return keyErr("error.unknownQuality", nil)
+	}
+	if n.Language != "" && !slices.Contains(s.locales(), n.Language) {
+		return keyErr("error.unknownLanguage", nil)
 	}
 	n.OutDir = filepath.Clean(n.OutDir)
 	if !filepath.IsAbs(n.OutDir) {
-		return errors.New("le dossier doit être un chemin complet (ex. D:\\Vidéos\\GhostCam)")
+		return keyErr("error.dirNotAbsolute", nil)
 	}
 	if err := checkWritable(n.OutDir); err != nil {
-		return fmt.Errorf("dossier inutilisable : %w", err)
+		return keyErr("error.dirUnusable", map[string]any{"detail": err.Error()})
 	}
 	s.mu.Lock()
 	s.set = n
@@ -122,14 +125,18 @@ func (s *Server) settingsHandlers(mux *http.ServeMux) {
 		Settings
 		Qualities []Quality `json:"qualities"`
 		CanPick   bool      `json:"canPick"`
+		Locales   []string  `json:"locales"`
 	}
-	writeJSON := func(w http.ResponseWriter, v any) {
+	writeJSON := func(w http.ResponseWriter, v any, status ...int) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
+		if len(status) > 0 {
+			w.WriteHeader(status[0])
+		}
 		_ = json.NewEncoder(w).Encode(v)
 	}
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil})
+		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil, Locales: s.locales()})
 	})
 	mux.HandleFunc("POST /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {
@@ -137,14 +144,18 @@ func (s *Server) settingsHandlers(mux *http.ServeMux) {
 		}
 		var n Settings
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&n); err != nil {
-			http.Error(w, "requête invalide", http.StatusBadRequest)
+			writeJSON(w, Msg{Key: "error.badRequest"}, http.StatusBadRequest)
 			return
 		}
 		if err := s.updateSettings(n); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			var ke *KeyError
+			if !errors.As(err, &ke) {
+				ke = &KeyError{Msg{Key: "error.saveFailed", Vars: map[string]any{"detail": err.Error()}}}
+			}
+			writeJSON(w, ke.Msg, http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil})
+		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil, Locales: s.locales()})
 	})
 	// Native folder picker; the UI then saves the result with POST /api/settings.
 	mux.HandleFunc("POST /api/pick-folder", func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +163,7 @@ func (s *Server) settingsHandlers(mux *http.ServeMux) {
 			return
 		}
 		if s.cfg.PickDir == nil {
-			http.Error(w, "non disponible", http.StatusNotImplemented)
+			http.Error(w, "not available", http.StatusNotImplemented)
 			return
 		}
 		dir, err := s.cfg.PickDir(s.outDir())

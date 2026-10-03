@@ -12,7 +12,28 @@ be trusted to keep them, so **reliability and security come before features**.
 - **Bugs.** Steps to reproduce, what you expected, what happened, logs.
 - **Code.** Pick an item from *Known issues and roadmap* in the README, or open
   an issue first for anything larger than a small fix.
-- **Docs and translations.** The UI is French only today.
+- **Translations.** See [Translations](#translations) below.
+
+## Translations
+
+All interface texts live in `web/locales/<language>.json`, in **i18next JSON
+v4** format. `en.json` is the source language. The Go code never sends display
+text, only keys (for example `progress.cfDownload`), which the page translates.
+
+To add a language, for example German:
+
+1. Copy `web/locales/en.json` to `web/locales/de.json`, using a BCP 47 code:
+   `de`, `pt-BR`, `zh-Hans`…
+2. Translate the values. Keep the keys and the `{{variables}}` unchanged.
+3. Plurals: provide every form your language needs, as `key_one`, `key_few`,
+   `key_many`, `key_other`… The check below tells you which ones are missing.
+4. Run `docker compose run --rm i18n`. It reports missing or stale keys, missing
+   plural forms and variable mismatches.
+5. Rebuild: the new language is picked up automatically. Nothing else to change.
+
+**Weblate / Crowdin / Lokalise:** use the file format *i18next JSON v4*, the
+file mask `web/locales/*.json` and the monolingual base file
+`web/locales/en.json`.
 
 ## Development setup
 
@@ -33,12 +54,15 @@ browser refresh picks up your changes.
 ## Before opening a pull request
 
 1. `gofmt` clean and `go vet` clean for Linux **and** Windows (`GOOS=windows`).
-2. The end-to-end tests pass in both modes:
+2. The end-to-end tests pass in both modes, and the translations are consistent:
    ```sh
    docker compose run --rm build-linux
    MODE=webrtc docker compose run --rm e2e
    MODE=relay  docker compose run --rm e2e
+   docker compose run --rm i18n
    ```
+   New user-facing text goes into `web/locales/en.json` (and `fr.json`), never
+   hard-coded in HTML, JS or Go.
 3. If you change the recording path, the protocol or the crypto, explain in the
    description how a hard cut (phone killed mid-video) is still safe, and how
    the change keeps the guarantees of the security model in the README.

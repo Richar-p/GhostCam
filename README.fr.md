@@ -121,8 +121,8 @@ copie dans `%LOCALAPPDATA%\GhostCam\bin\` :
   jour échoue, la version précédente est conservée.
 - `cloudflared` tourne dans un Job Object Windows : il s'arrête avec GhostCam,
   même en cas de crash ou d'arrêt forcé.
-- Le QR code n'apparaît qu'une fois le nom du tunnel visible dans le DNS public
-  (vérifié auprès de 1.1.1.1, pour ne pas polluer le cache DNS de la box).
+- Le QR code n'apparaît qu'une fois la page du téléphone réellement chargée via
+  le tunnel (résolution par 1.1.1.1, pour ne pas polluer le cache DNS de la box).
 
 `-cloudflared <chemin>` court-circuite tout cela et utilise votre propre binaire.
 
@@ -207,6 +207,20 @@ STUN).
 
 Les logs sont écrits dans `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
 
+## Langues
+
+L'interface est disponible en **anglais** et en **français** :
+- La page du téléphone suit la langue de son navigateur.
+- La fenêtre PC suit la langue de Windows, ou le choix fait dans Paramètres → *Langue*.
+- Pour une langue non disponible, l'anglais est utilisé.
+
+Les traductions sont dans [`web/locales/`](web/locales), un fichier par langue
+au format **i18next JSON v4** (clés hiérarchiques, `{{variables}}`, formes de
+pluriel CLDR comme `_one` / `_many` / `_other`). `en.json` est la source. Ce
+format fonctionne tel quel avec Weblate, Crowdin, Lokalise et les outils
+similaires. Pour ajouter une langue, voir
+[CONTRIBUTING.md](CONTRIBUTING.md#translations).
+
 ## Tests
 
 Un test de bout en bout utilise un Chromium sans interface, avec une fausse
@@ -220,6 +234,8 @@ docker compose run --rm build-linux
 MODE=webrtc docker compose run --rm e2e                   # chemin direct
 MODE=relay  docker compose run --rm e2e                   # UDP bloqué : relais chiffré
 MODE=webrtc docker compose run --rm -e QUALITY2=high e2e  # qualité en hausse plutôt qu'en baisse
+LOCALE=en-US docker compose run --rm e2e                  # téléphone et fenêtre PC en anglais (défaut : fr-FR)
+docker compose run --rm i18n                              # fichiers de traduction : clés, pluriels, variables
 ```
 
 Pour chaque fichier, le test affiche le nombre d'images et la résolution de la
@@ -234,10 +250,12 @@ internal/record/     fichier en ajout seul synchronisé sur disque, multiplexeur
 internal/pairing/    secret d'appairage, authentification HMAC, déchiffrement AES-GCM des trames
 internal/tunnel/     Cloudflare Quick Tunnel
 internal/upnp/       ouverture du port sur la box + renouvellement du bail
-web/                 page du téléphone (index.html, app.js), fenêtre PC (admin.html), icône (intégrées au binaire)
+web/                 page du téléphone (index.html, app.js), fenêtre PC (admin.html), i18n.js, icône (intégrées au binaire)
+web/locales/         traductions, i18next JSON v4 (en.json = source)
 notices.go           intègre LICENSE + third_party_licenses.txt (affichés dans l'app)
 scripts/             gen-notices.sh : régénère third_party_licenses.txt
 test/e2e/            test de bout en bout Playwright
+test/i18n/           contrôle de cohérence des traductions
 ```
 
 ## Problèmes connus et feuille de route
@@ -250,7 +268,7 @@ Bons points d'entrée pour contribuer :
 - **Page du téléphone auto-hébergée**, pour ne plus avoir à faire confiance au tunnel pour le JavaScript (voir le Modèle de sécurité).
 - **Fenêtre native sur macOS et Linux.** Ces plateformes utilisent pour l'instant le navigateur.
 - **Tests unitaires et CI.** Il n'y a aujourd'hui que le test de bout en bout.
-- **Traduction de l'interface.** Elle n'existe qu'en français.
+- **Plus de langues.** L'anglais et le français sont disponibles : les traductions sont les bienvenues (voir [Langues](#langues)).
 - **ICE restart**, plutôt qu'un nouveau fichier lors des coupures réseau courtes.
 - **Index de navigation à l'arrêt**, par remultiplexage pour ajouter des Cues et permettre aux lecteurs d'avancer dans la vidéo.
 

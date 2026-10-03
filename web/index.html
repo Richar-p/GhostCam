@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -44,19 +44,20 @@
 </head>
 <body>
 <video id="preview" autoplay playsinline muted></video>
-<div class="top"><span id="conn">Hors ligne</span></div>
+<div class="top"><span id="conn" data-i18n="phone.conn.offline">Offline</span></div>
 <div id="timer" hidden>00:00</div>
 <div id="toast"><span id="toast-text"></span></div>
 <div class="bottom">
-  <button id="rec" aria-label="Démarrer l'enregistrement" disabled></button>
+  <button id="rec" data-i18n-attr="aria-label:phone.rec.start" disabled></button>
   <div id="info"></div>
 </div>
 <section id="intro">
   <img src="/icon.svg" width="72" height="72" alt="">
   <h1>GhostCam</h1>
-  <p id="intro-text">La vidéo est envoyée en direct sur votre PC et n'est jamais stockée sur ce téléphone.</p>
-  <button id="go">Activer la caméra</button>
+  <p id="intro-text" data-i18n="phone.intro.text"></p>
+  <button id="go" data-i18n="phone.intro.go">Enable camera</button>
 </section>
+<script src="/i18n.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

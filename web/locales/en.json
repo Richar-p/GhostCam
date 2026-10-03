@@ -1,0 +1,165 @@
+{
+  "common": {
+    "mode": {
+      "direct": "Direct connection",
+      "relay": "Encrypted relay"
+    },
+    "mb": "{{n}} MB",
+    "gb": "{{n}} GB",
+    "mbps": "{{n}} Mbit/s"
+  },
+  "pc": {
+    "pill": {
+      "starting": "Starting",
+      "error": "Error",
+      "rec": "● REC",
+      "connected": "Connected",
+      "waiting": "Waiting",
+      "stopped": "Stopped"
+    },
+    "settingsButton": "Settings",
+    "starting": {
+      "title": "Starting GhostCam…",
+      "sub": "A few seconds to make this PC reachable from the Internet."
+    },
+    "error": {
+      "title": "Couldn't start"
+    },
+    "pair": {
+      "title": "Scan with your phone",
+      "sub": "With the camera app, on 4G/5G or Wi-Fi.",
+      "sub2": "Nothing is stored on the phone.",
+      "qrAlt": "Pairing QR code"
+    },
+    "ready": {
+      "title": "Phone connected",
+      "sub": "{{mode}} · press the red button on the phone to record."
+    },
+    "live": {
+      "label": "Recording on this PC",
+      "starting": "Starting…",
+      "rate": "Received: {{rate}} · target {{target}} ({{quality}})",
+      "netWarn": "The phone's network can't keep up with the chosen quality: lower it in the settings (next video)."
+    },
+    "history": {
+      "count_one": "{{count}} video recorded",
+      "count_other": "{{count}} videos recorded",
+      "last": "Last: {{file}} · {{size}}"
+    },
+    "copy": {
+      "button": "Copy link",
+      "done": "Link copied ✓",
+      "failed": "Copy failed"
+    },
+    "openFolder": "Open videos",
+    "foot": {
+      "upnp": "Port open on the router (UPnP) · direct connection possible",
+      "dir": "Videos: {{dir}}"
+    },
+    "settings": {
+      "title": "Settings",
+      "back": "Back",
+      "quality": "Video quality",
+      "folder": "Videos folder",
+      "browse": "Browse…",
+      "language": "Language",
+      "languageAuto": "Automatic ({{lang}})",
+      "save": "Save",
+      "saved": "Saved ✓",
+      "appliesNext": "Applies from the next video, without reconnecting the phone.",
+      "licenses": "Open source licenses",
+      "source": "Source code"
+    },
+    "quality": {
+      "meta": "{{height}}p · {{fps}} fps · ≈ {{rate}} · ≈ {{perHour}} GB/hour",
+      "eco": {
+        "label": "Economy",
+        "risk": "Safest on a weak network: the least delay."
+      },
+      "standard": {
+        "label": "Standard",
+        "risk": "Good balance between sharpness and reliability. Recommended."
+      },
+      "high": {
+        "label": "High",
+        "risk": "Needs a good upload connection. Otherwise: choppy video or delay."
+      },
+      "max": {
+        "label": "Maximum",
+        "risk": "For Wi-Fi or very good 4G/5G. High risk of delay on mobile networks."
+      },
+      "warnHot": "⚠ Latency risk.",
+      "warnNeed": "The phone must be able to upload ≈ {{rate}} continuously.",
+      "warnIf": "If its connection can't keep up:",
+      "warnDirect": "Direct connection: the video stays real-time, but gets choppy (fewer frames per second) and compression becomes more visible.",
+      "warnRelay": "Encrypted relay: the video piles up on the phone before being sent. Those seconds are not on the PC yet and would be lost if the phone were destroyed. The phone then shows “Slow network”."
+    }
+  },
+  "phone": {
+    "intro": {
+      "text": "The video is sent live to your PC and never stored on this phone.",
+      "go": "Enable camera",
+      "invalidLink": "Invalid pairing link: scan the QR code shown on the PC.",
+      "cameraError": "Camera unavailable: {{detail}}"
+    },
+    "rec": {
+      "start": "Start recording",
+      "stop": "Stop recording"
+    },
+    "info": {
+      "tap": "Tap to record",
+      "count_one": "{{count}} video saved on the PC",
+      "count_other": "{{count}} videos saved on the PC",
+      "starting": "Starting…",
+      "recording": "Recording on the PC, nothing is kept here"
+    },
+    "conn": {
+      "offline": "Offline",
+      "connecting": "Connecting to the PC…",
+      "connected": "Connected to the PC · {{mode}}",
+      "unstable": "Unstable network…",
+      "slow": "Slow network · {{kb}} KB pending",
+      "noDirect": "No direct path, trying the relay…",
+      "retry": "Reconnecting… ({{detail}})",
+      "lost": "Connection lost, reconnecting…",
+      "refused": "Connection refused: this is not your PC"
+    },
+    "mode": {
+      "direct": "direct",
+      "relay": "encrypted relay"
+    },
+    "toast": {
+      "saved": "Video saved on the PC",
+      "savedSize": "Video saved on the PC · {{size}}",
+      "resumed": "Recording resumed (new file)",
+      "lost": "Connection lost: what was filmed is already on the PC",
+      "error": "Error: {{detail}}"
+    },
+    "err": {
+      "closed": "connection closed",
+      "unreachable": "server unreachable",
+      "noReply": "no reply from the PC",
+      "refused": "refused by the PC",
+      "noRecorder": "MediaRecorder not supported"
+    }
+  },
+  "progress": {
+    "cfFirst": "First launch: downloading cloudflared {{version}}…",
+    "cfUpdate": "Updating cloudflared {{from}} → {{to}}…",
+    "cfDownload": "Downloading cloudflared {{version}}… {{done}} / {{total}} MB",
+    "cfSignature": "Checking the cloudflared signature…",
+    "tunnel": "Opening the secure link…",
+    "publicCheck": "Checking the public link…"
+  },
+  "error": {
+    "publicListener": "The public server ({{addr}}) failed: {{detail}}",
+    "cloudflared": "Couldn't get cloudflared (Internet connection?): {{detail}}",
+    "tunnel": "The Cloudflare tunnel failed: {{detail}}",
+    "unknownQuality": "Unknown quality",
+    "unknownLanguage": "Unknown language",
+    "dirNotAbsolute": "The folder must be a full path (e.g. D:\\Videos\\GhostCam)",
+    "dirUnusable": "Folder unusable: {{detail}}",
+    "badRequest": "Invalid request",
+    "saveFailed": "Couldn't save the settings: {{detail}}"
+  }
+}

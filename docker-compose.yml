@@ -49,9 +49,18 @@ services:
     profiles: ["test"]
     environment:
       MODE: ${MODE:-webrtc}
+      LOCALE: ${LOCALE:-fr-FR}
     volumes:
       - .:/src
     command: sh -c "cp /src/test/e2e/run.mjs /e2e/ && node /e2e/run.mjs"
+
+  # docker compose run --rm i18n  -> checks web/locales/*.json (keys, plurals, variables, keys used in code)
+  i18n:
+    build: { context: ., target: e2e }
+    profiles: ["test"]
+    volumes:
+      - .:/src:ro
+    command: node /src/test/i18n/check.mjs
 
   # docker compose run --rm icons  -> regenerate icons from web/icon.svg
   icons:

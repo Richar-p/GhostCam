@@ -10,7 +10,7 @@ import (
 	"io/fs"
 	"log"
 	"net"
-	"net/url"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -88,7 +88,7 @@ func main() {
 
 	go func() {
 		if err := srv.ServePublic(ctx); err != nil {
-			srv.SetError(fmt.Errorf("serveur public (%s) : %w", *listen, err))
+			srv.SetError("error.publicListener", err, map[string]any{"addr": *listen})
 		}
 	}()
 	go func() {
@@ -124,9 +124,9 @@ func main() {
 		}()
 		base := *publicURL
 		if base == "" {
-			t, err := startTunnel(ctx, *cfBin, *listen, filepath.Join(dataDir, "bin"), srv.SetProgress)
+			t, errKey, err := startTunnel(ctx, *cfBin, *listen, filepath.Join(dataDir, "bin"), srv.SetProgress)
 			if err != nil {
-				srv.SetError(err)
+				srv.SetError(errKey, err, nil)
 				<-ctx.Done()
 				return
 			}
@@ -134,7 +134,7 @@ func main() {
 			base = t.URL
 			// A fresh quick-tunnel hostname can take a few seconds to resolve:
 			// show the QR code only once the phone can actually reach it.
-			srv.SetProgress("Vérification du lien public…")
+			srv.SetProgress("progress.publicCheck", nil)
 			waitReachable(ctx, base, 30*time.Second)
 		}
 		srv.SetPublicURL(base)
@@ -169,54 +169,66 @@ func main() {
 // startTunnel uses -cloudflared if given; otherwise a managed copy in the app
 // data folder, downloaded and updated automatically (single-file install).
 // A cloudflared next to the exe or in PATH is only a fallback.
-func startTunnel(ctx context.Context, bin, listen, binDir string, progress func(string)) (*tunnel.Tunnel, error) {
+// On failure it returns the translation key of the error to show.
+func startTunnel(ctx context.Context, bin, listen, binDir string, progress tunnel.Progress) (*tunnel.Tunnel, string, error) {
 	if bin == "" {
 		var err error
 		if bin, err = tunnel.Ensure(ctx, binDir, progress); err != nil {
 			log.Printf("cloudflared: %v", err)
 			fb, ferr := tunnel.FindBinary()
 			if ferr != nil {
-				return nil, err
+				return nil, "error.cloudflared", err
 			}
 			bin = fb
 		}
 	}
-	progress("Ouverture du lien sécurisé…")
+	progress("progress.tunnel", nil)
 	log.Printf("starting Cloudflare quick tunnel (%s)…", bin)
 	t, err := tunnel.StartQuick(ctx, bin, "http://"+listen)
 	if err != nil {
-		return nil, fmt.Errorf("tunnel Cloudflare : %w", err)
+		return nil, "error.tunnel", err
 	}
-	return t, nil
+	return t, "", nil
 }
 
-// waitReachable waits until the tunnel hostname resolves on public DNS. It
-// asks 1.1.1.1 directly: querying the local resolver (often the router) too
+// waitReachable waits until the phone page actually loads through the tunnel
+// (HTTP 200: a fresh tunnel can briefly answer 530). The hostname is resolved
+// with 1.1.1.1 directly: querying the local resolver (often the router) too
 // early would cache the "no such host" answer and break the phone's first
 // attempt when it is on the same Wi-Fi.
 func waitReachable(ctx context.Context, base string, max time.Duration) {
-	u, err := url.Parse(base)
-	if err != nil {
-		return
-	}
 	r := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, network, "1.1.1.1:53")
 	}}
+	client := &http.Client{Timeout: 4 * time.Second, Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := r.LookupHost(ctx, host)
+			if err != nil || len(ips) == 0 {
+				return nil, fmt.Errorf("resolve %s: %v", host, err)
+			}
+			var d net.Dialer
+			return d.DialContext(ctx, network, net.JoinHostPort(ips[0], port))
+		},
+	}}
 	deadline := time.Now().Add(max)
 	for time.Now().Before(deadline) && ctx.Err() == nil {
-		lctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		addrs, err := r.LookupHost(lctx, u.Hostname())
-		cancel()
-		if err == nil && len(addrs) > 0 {
-			return
+		if resp, err := client.Get(base + "/"); err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return
+			}
 		}
 		select {
 		case <-ctx.Done():
 		case <-time.After(time.Second):
 		}
 	}
-	log.Printf("tunnel hostname not visible on public DNS after %s, showing it anyway", max)
+	log.Printf("phone page not reachable through the tunnel after %s, showing the QR code anyway", max)
 }
 
 func defaultOutDir() string {

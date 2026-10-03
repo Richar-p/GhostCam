@@ -9,6 +9,8 @@ import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, rmSync } from 'node:fs';
 
 const MODE = process.env.MODE || 'webrtc';
+const LOCALE = process.env.LOCALE || 'fr-FR'; // browser language of the phone and the PC window
+const EXPECT = { fr: { go: 'Activer la caméra', pill: 'En attente' }, en: { go: 'Enable camera', pill: 'Waiting' } }[LOCALE.split('-')[0]];
 const OUT = `/tmp/rec-${MODE}`;
 const OUT2 = `/tmp/rec-${MODE}-moved`; // folder chosen in settings after video 1
 const VIDEOS = 3;
@@ -30,10 +32,19 @@ const args = ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-str
 // No UDP at all: WebRTC cannot connect, the page must fall back to the relay.
 if (MODE === 'relay') args.push('--force-webrtc-ip-handling-policy=disable_non_proxied_udp');
 const browser = await chromium.launch({ args });
-const page = await (await browser.newContext({ bypassCSP: true })).newPage(); // test-only: lets Playwright evaluate
+const page = await (await browser.newContext({ bypassCSP: true, locale: LOCALE })).newPage(); // bypassCSP: test-only, lets Playwright evaluate
+
+// PC window in the same language.
+const pcPage = await (await browser.newContext({ bypassCSP: true, locale: LOCALE })).newPage();
+await pcPage.goto('http://localhost:8081/');
+await pcPage.waitForFunction((want) => document.querySelector('#pill').textContent === want, EXPECT.pill, { timeout: 10000 });
+console.log(`PC window [${await pcPage.evaluate(() => document.documentElement.lang)}]: "${await pcPage.textContent('#pill')}"`);
+await pcPage.close();
 page.on('console', (m) => console.log('  [phone]', m.text()));
 
 await page.goto(url);
+await page.waitForFunction((want) => document.querySelector('#go').textContent === want, EXPECT.go, { timeout: 10000 });
+console.log(`phone [${await page.evaluate(() => document.documentElement.lang)}]: "${await page.textContent('#go')}"`);
 await page.click('#go');
 await page.waitForFunction(() => document.querySelector('#conn').className === 'ok' && !document.querySelector('#rec').disabled, null, { timeout: 60000 });
 console.log('connected:', await page.textContent('#conn'));

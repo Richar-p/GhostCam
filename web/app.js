@@ -8,6 +8,7 @@
 // loss); each Rec/Stop makes a separate file on the PC.
 
 const $ = (id) => document.getElementById(id);
+const { t } = I18N; // texts: web/locales/*.json, language of the phone's browser
 const enc = new TextEncoder();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -73,7 +74,7 @@ function setConn(text, cls = '') {
   $('conn').textContent = text;
   $('conn').className = cls;
 }
-const fmtSize = (b) => (b < 1024 ** 3 ? (b / 1024 ** 2).toFixed(1).replace('.', ',') + ' Mo' : (b / 1024 ** 3).toFixed(2).replace('.', ',') + ' Go');
+const fmtSize = (b) => (b < 1024 ** 3 ? t('common.mb', { n: I18N.num(b / 1024 ** 2, 1) }) : t('common.gb', { n: I18N.num(b / 1024 ** 3, 2) }));
 const fmtTime = (s) => {
   const p = (n) => String(n).padStart(2, '0');
   return (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + p(Math.floor(s / 60) % 60) + ':' + p(s % 60);
@@ -84,14 +85,14 @@ function render() {
   const recording = S.want && S.recStart > 0;
   rec.classList.toggle('on', S.want);
   rec.disabled = S.busy || (!S.transport && !S.want);
-  rec.setAttribute('aria-label', S.want ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement");
+  rec.setAttribute('aria-label', t(S.want ? 'phone.rec.stop' : 'phone.rec.start'));
   $('timer').hidden = !recording;
   if (!S.want) {
-    $('info').textContent = S.count ? `${S.count} vidéo${S.count > 1 ? 's' : ''} enregistrée${S.count > 1 ? 's' : ''} sur le PC` : 'Appuyez pour filmer';
+    $('info').textContent = S.count ? t('phone.info.count', { count: S.count }) : t('phone.info.tap');
   } else if (!recording) {
-    $('info').textContent = 'Démarrage…';
+    $('info').textContent = t('phone.info.starting');
   } else {
-    $('info').textContent = "Enregistrement sur le PC, rien n'est gardé ici";
+    $('info').textContent = t('phone.info.recording');
   }
 }
 setInterval(() => {
@@ -174,17 +175,17 @@ function openSignaling() {
       const m = JSON.parse(e.data);
       waiters.length ? waiters.shift().resolve(m) : queue.push(m);
     };
-    ws.onclose = (e) => { while (waiters.length) waiters.shift().reject(new Error(`connexion fermée (${e.code})`)); };
-    ws.onerror = () => reject(new Error('serveur injoignable'));
+    ws.onclose = (e) => { while (waiters.length) waiters.shift().reject(new Error(`${t('phone.err.closed')} (${e.code})`)); };
+    ws.onerror = () => reject(new Error(t('phone.err.unreachable')));
     ws.next = (timeout = 15000) => {
       if (queue.length) return Promise.resolve(queue.shift());
-      if (ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error('connexion fermée'));
+      if (ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error(t('phone.err.closed')));
       return new Promise((res, rej) => {
         const w = {
-          resolve: (m) => { clearTimeout(t); res(m); },
-          reject: (e) => { clearTimeout(t); rej(e); },
+          resolve: (m) => { clearTimeout(timer); res(m); },
+          reject: (e) => { clearTimeout(timer); rej(e); },
         };
-        const t = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); rej(new Error('pas de réponse du PC')); }, timeout);
+        const timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); rej(new Error(t('phone.err.noReply'))); }, timeout);
         waiters.push(w);
       });
     };
@@ -246,9 +247,9 @@ async function connectWebRTC() {
     const videoSender = (senders.find((s) => s.track.kind === 'video') || {}).sender;
 
     await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('timeout WebRTC')), 12000);
-      dc.onopen = () => { clearTimeout(t); resolve(); };
-      pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') { clearTimeout(t); reject(new Error('ICE failed')); } };
+      const timer = setTimeout(() => reject(new Error('timeout WebRTC')), 12000);
+      dc.onopen = () => { clearTimeout(timer); resolve(); };
+      pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') { clearTimeout(timer); reject(new Error('ICE failed')); } };
     });
     ws.close(); // signaling no longer needed
     ok = true;
@@ -256,8 +257,8 @@ async function connectWebRTC() {
     const pending = {};
     dc.onmessage = (e) => { const m = JSON.parse(e.data); if (pending[m.type]) pending[m.type](m); };
     const request = (type, expect) => new Promise((res, rej) => {
-      const t = setTimeout(() => { delete pending[expect]; rej(new Error('pas de réponse du PC')); }, 8000);
-      pending[expect] = (m) => { clearTimeout(t); delete pending[expect]; res(m); };
+      const timer = setTimeout(() => { delete pending[expect]; rej(new Error(t('phone.err.noReply'))); }, 8000);
+      pending[expect] = (m) => { clearTimeout(timer); delete pending[expect]; res(m); };
       dc.send(JSON.stringify({ type }));
     });
 
@@ -265,8 +266,8 @@ async function connectWebRTC() {
       let timer;
       const check = () => {
         const s = pc.connectionState;
-        if (s === 'connected') { clearTimeout(timer); timer = null; setConn('Connecté au PC · direct', 'ok'); }
-        if (s === 'disconnected' && !timer) { setConn('Réseau instable…', 'warn'); timer = setTimeout(resolve, 8000); }
+        if (s === 'connected') { clearTimeout(timer); timer = null; setConn(t('phone.conn.connected', { mode: t('phone.mode.direct') }), 'ok'); }
+        if (s === 'disconnected' && !timer) { setConn(t('phone.conn.unstable'), 'warn'); timer = setTimeout(resolve, 8000); }
         if (s === 'failed' || s === 'closed') resolve();
       };
       pc.onconnectionstatechange = check;
@@ -274,7 +275,7 @@ async function connectWebRTC() {
     });
 
     return {
-      kind: 'direct',
+      kind: 'direct', // phone.mode.<kind>
       closed,
       async start() {
         const m = await request('start', 'started');
@@ -305,7 +306,7 @@ const FRAME_START = 1, FRAME_DATA = 2, FRAME_STOP = 3;
 
 async function connectRelay() {
   const mime = pickMime();
-  if (!mime) throw new Error('MediaRecorder non supporté');
+  if (!mime) throw new Error(t('phone.err.noRecorder'));
   const ws = await openSignaling();
   let nonce;
   try {
@@ -313,7 +314,7 @@ async function connectRelay() {
     nonce = b64urlDecode(hello.nonce);
     if (hello.quality) S.quality = hello.quality;
     ws.send(JSON.stringify({ type: 'relay', mac: await mac(nonce, 'relay', '') }));
-    if ((await ws.next()).type !== 'ready') throw new Error('refusé par le PC');
+    if ((await ws.next()).type !== 'ready') throw new Error(t('phone.err.refused'));
   } catch (e) { ws.close(); throw e; }
 
   // Every frame, control included, is encrypted: seq(8) || iv(12) || AES-GCM(type || payload).
@@ -327,8 +328,8 @@ async function connectRelay() {
       const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: concat(nonce, seqBytes) }, kEnc, concat(new Uint8Array([type]), body));
       if (ws.readyState === WebSocket.OPEN) ws.send(concat(seqBytes, iv, new Uint8Array(ct)));
       const lag = Math.round(ws.bufferedAmount / 1024);
-      if (lag > 512) setConn(`Réseau lent · ${lag} Ko en attente`, 'warn');
-      else setConn('Connecté au PC · relais chiffré', 'ok');
+      if (lag > 512) setConn(t('phone.conn.slow', { kb: lag }), 'warn');
+      else setConn(t('phone.conn.connected', { mode: t('phone.mode.relay') }), 'ok');
     });
     return chain;
   };
@@ -337,12 +338,12 @@ async function connectRelay() {
   closed.then(() => clearInterval(ping));
 
   return {
-    kind: 'relais chiffré',
+    kind: 'relay',
     closed,
     async start() {
       sendFrame(FRAME_START, enc.encode(mime));
       const ack = await ws.next(8000);
-      if (ack.type !== 'started') throw new Error('refusé par le PC');
+      if (ack.type !== 'started') throw new Error(t('phone.err.refused'));
       await applyQuality(ack.quality);
       rec = new MediaRecorder(S.stream, { mimeType: mime, videoBitsPerSecond: S.quality.bitrate });
       rec.ondataavailable = (e) => { if (e.data.size) sendFrame(FRAME_DATA, e.data); };
@@ -363,8 +364,8 @@ async function connectRelay() {
 
 // ---------------------------------------------------------- main loop
 
-async function startRecording(t) {
-  await t.start();
+async function startRecording(tr) {
+  await tr.start();
   S.recStart = Date.now();
   render();
 }
@@ -372,38 +373,38 @@ async function startRecording(t) {
 async function connectionLoop() {
   let preferWebRTC = true;
   for (;;) {
-    let t;
+    let tr;
     try {
       await ensureStream();
-      setConn('Connexion au PC…');
-      t = preferWebRTC ? await connectWebRTC() : await connectRelay();
+      setConn(t('phone.conn.connecting'));
+      tr = preferWebRTC ? await connectWebRTC() : await connectRelay();
     } catch (e) {
       console.warn(e);
       if (e.message === 'FINGERPRINT') {
-        setConn('Connexion refusée : ce n\'est pas votre PC', 'warn');
+        setConn(t('phone.conn.refused'), 'warn');
         return;
       }
-      setConn(preferWebRTC ? 'Pas de chemin direct, essai du relais…' : `Reconnexion… (${e.message})`, 'warn');
+      setConn(preferWebRTC ? t('phone.conn.noDirect') : t('phone.conn.retry', { detail: e.message }), 'warn');
       preferWebRTC = !preferWebRTC;
       await sleep(1500);
       continue;
     }
 
-    S.transport = t;
-    setConn(`Connecté au PC · ${t.kind}`, 'ok');
+    S.transport = tr;
+    setConn(t('phone.conn.connected', { mode: t(`phone.mode.${tr.kind}`) }), 'ok');
     render();
     if (S.want) {
       // Connection came back during a video: resume in a new file.
-      try { await startRecording(t); toast('Enregistrement repris (nouveau fichier)'); } catch (e) { t.close(); }
+      try { await startRecording(tr); toast(t('phone.toast.resumed')); } catch (e) { tr.close(); }
     }
 
-    await t.closed;
-    t.close();
+    await tr.closed;
+    tr.close();
     S.transport = null;
     S.recStart = 0;
     render();
-    setConn('Connexion perdue, reconnexion…', 'warn');
-    if (S.want) toast('Connexion perdue : ce qui a été filmé est déjà sur le PC');
+    setConn(t('phone.conn.lost'), 'warn');
+    if (S.want) toast(t('phone.toast.lost'));
     await sleep(1000);
   }
 }
@@ -412,26 +413,26 @@ async function toggle() {
   if (S.busy) return;
   S.busy = true;
   render();
-  const t = S.transport;
+  const tr = S.transport;
   try {
     if (!S.want) {
       S.want = true;
       render();
-      if (t) await startRecording(t);
+      if (tr) await startRecording(tr);
     } else {
       S.want = false;
       S.recStart = 0;
       render();
-      if (t) {
-        const r = await t.stop();
+      if (tr) {
+        const r = await tr.stop();
         S.count++;
-        toast(r && r.bytes ? `Vidéo enregistrée sur le PC · ${fmtSize(r.bytes)}` : 'Vidéo enregistrée sur le PC');
+        toast(r && r.bytes ? t('phone.toast.savedSize', { size: fmtSize(r.bytes) }) : t('phone.toast.saved'));
       }
     }
   } catch (e) {
     console.warn(e);
-    toast(`Erreur : ${e.message}`);
-    if (t && S.want) t.close(); // reconnect; the loop resumes recording
+    toast(t('phone.toast.error', { detail: e.message }));
+    if (tr && S.want) tr.close(); // reconnect; the loop resumes recording
   } finally {
     S.busy = false;
     render();
@@ -445,7 +446,7 @@ async function activate() {
     await ensureStream();
     await keepAwake();
   } catch (e) {
-    $('intro-text').textContent = `Caméra indisponible : ${e.message}`;
+    $('intro-text').textContent = t('phone.intro.cameraError', { detail: e.message });
     $('go').disabled = false;
     return;
   }
@@ -454,10 +455,13 @@ async function activate() {
   connectionLoop();
 }
 
-if (!TOKEN || !PINNED_FP || !window.isSecureContext) {
-  $('intro-text').textContent = "Lien d'appairage invalide : scannez le QR code affiché sur le PC.";
-  $('go').hidden = true;
-} else {
-  $('go').addEventListener('click', activate);
-  $('rec').addEventListener('click', toggle);
-}
+I18N.init().catch((e) => console.warn('i18n', e)).finally(() => {
+  if (!TOKEN || !PINNED_FP || !window.isSecureContext) {
+    $('intro-text').textContent = t('phone.intro.invalidLink');
+    $('go').hidden = true;
+  } else {
+    $('go').addEventListener('click', activate);
+    $('rec').addEventListener('click', toggle);
+  }
+  render();
+});

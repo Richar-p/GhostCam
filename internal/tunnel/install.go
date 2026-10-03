@@ -34,6 +34,9 @@ type installedInfo struct {
 	SHA256 string `json:"sha256"`
 }
 
+// Progress reports a startup step as a translation key (web/locales) + variables.
+type Progress func(key string, vars map[string]any)
+
 // Ensure returns a verified, up-to-date cloudflared kept in dir, downloading
 // it from Cloudflare's official GitHub releases when missing or outdated.
 // Offline, an already installed copy is used as is.
@@ -42,7 +45,7 @@ type installedInfo struct {
 // publishes for the asset (and the checksum Cloudflare lists in the release
 // notes, when present) and, on Windows, if it carries a valid Authenticode
 // signature from "Cloudflare, Inc.".
-func Ensure(ctx context.Context, dir string, progress func(string)) (string, error) {
+func Ensure(ctx context.Context, dir string, progress Progress) (string, error) {
 	asset, exe, err := assetName()
 	if err != nil {
 		return "", err
@@ -61,21 +64,21 @@ func Ensure(ctx context.Context, dir string, progress func(string)) (string, err
 			log.Printf("cloudflared: update check failed (%v), using installed %s", err, cur.Tag)
 			return bin, nil
 		}
-		return "", fmt.Errorf("impossible de récupérer cloudflared (connexion Internet ?) : %w", err)
+		return "", fmt.Errorf("cannot reach GitHub releases: %w", err)
 	}
 	if haveCur && cur.Tag == rel.Tag {
 		return bin, nil
 	}
 
 	if haveCur {
-		progress(fmt.Sprintf("Mise à jour de cloudflared %s → %s…", cur.Tag, rel.Tag))
+		progress("progress.cfUpdate", map[string]any{"from": cur.Tag, "to": rel.Tag})
 	} else {
-		progress(fmt.Sprintf("Premier lancement : téléchargement de cloudflared %s…", rel.Tag))
+		progress("progress.cfFirst", map[string]any{"version": rel.Tag})
 	}
 	tmp := bin + ".download"
 	err = download(ctx, rel, tmp, progress)
 	if err == nil {
-		progress("Vérification de la signature de cloudflared…")
+		progress("progress.cfSignature", nil)
 		err = verifySignature(tmp)
 	}
 	if err == nil {
@@ -87,7 +90,7 @@ func Ensure(ctx context.Context, dir string, progress func(string)) (string, err
 			log.Printf("cloudflared: update to %s failed (%v), keeping %s", rel.Tag, err, cur.Tag)
 			return bin, nil
 		}
-		return "", fmt.Errorf("installation de cloudflared : %w", err)
+		return "", fmt.Errorf("install: %w", err)
 	}
 	b, _ := json.Marshal(installedInfo{Tag: rel.Tag, SHA256: rel.SHA256})
 	if err := os.WriteFile(filepath.Join(dir, "cloudflared.json"), b, 0o600); err != nil {
@@ -108,7 +111,7 @@ func assetName() (asset, exe string, err error) {
 	case "linux/arm64":
 		return "cloudflared-linux-arm64", "cloudflared", nil
 	}
-	return "", "", fmt.Errorf("téléchargement automatique de cloudflared non géré sur %s/%s", runtime.GOOS, runtime.GOARCH)
+	return "", "", fmt.Errorf("no automatic cloudflared download for %s/%s", runtime.GOOS, runtime.GOARCH)
 }
 
 // readInstalled reports the installed version, after checking the binary still
@@ -177,7 +180,7 @@ func latestRelease(ctx context.Context, asset string) (release, error) {
 	return release{}, fmt.Errorf("asset %s not found in release %s", asset, r.TagName)
 }
 
-func download(ctx context.Context, rel release, dst string, progress func(string)) error {
+func download(ctx context.Context, rel release, dst string, progress Progress) error {
 	dctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(dctx, http.MethodGet, rel.URL, nil)
@@ -217,14 +220,14 @@ type progressWriter struct {
 	total, done int64
 	last        time.Time
 	tag         string
-	report      func(string)
+	report      Progress
 }
 
 func (p *progressWriter) Write(b []byte) (int, error) {
 	p.done += int64(len(b))
 	if time.Since(p.last) > 300*time.Millisecond {
 		p.last = time.Now()
-		p.report(fmt.Sprintf("Téléchargement de cloudflared %s… %d / %d Mo", p.tag, p.done>>20, p.total>>20))
+		p.report("progress.cfDownload", map[string]any{"version": p.tag, "done": p.done >> 20, "total": p.total >> 20})
 	}
 	return len(b), nil
 }

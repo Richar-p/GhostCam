@@ -73,8 +73,8 @@ type Server struct {
 	set       Settings
 	publicURL string
 	mapping   *upnp.Mapping
-	err       string // fatal startup error shown in the UI (e.g. tunnel down)
-	progress  string // startup step shown while the tunnel is not ready
+	err       *Msg // fatal startup error shown in the UI (e.g. tunnel down)
+	progress  *Msg // startup step shown while the tunnel is not ready
 	state     string
 	mode      string
 	file      *record.File
@@ -122,16 +122,22 @@ func (s *Server) SetPublicURL(u string) {
 	s.mu.Unlock()
 }
 
-func (s *Server) SetProgress(msg string) {
+// SetProgress shows a startup step (translation key + variables).
+func (s *Server) SetProgress(key string, vars map[string]any) {
 	s.mu.Lock()
-	s.progress = msg
+	s.progress = &Msg{Key: key, Vars: vars}
 	s.mu.Unlock()
 }
 
-func (s *Server) SetError(err error) {
-	log.Printf("error: %v", err)
+// SetError shows a fatal error; err's text is passed as the {{detail}} variable.
+func (s *Server) SetError(key string, err error, vars map[string]any) {
+	log.Printf("error: %s: %v", key, err)
+	if vars == nil {
+		vars = map[string]any{}
+	}
+	vars["detail"] = err.Error()
 	s.mu.Lock()
-	s.err = err.Error()
+	s.err = &Msg{Key: key, Vars: vars}
 	s.mu.Unlock()
 }
 
@@ -178,6 +184,7 @@ func (s *Server) ServePublic(ctx context.Context) error {
 	mux.HandleFunc("GET /icon.svg", s.static("icon.svg", "image/svg+xml"))
 	mux.HandleFunc("GET /icon.png", s.static("icon.png", "image/png"))
 	mux.HandleFunc("GET /ws", s.handleWS)
+	s.localeHandlers(mux)
 	return serve(ctx, s.cfg.PublicAddr, publicHeaders(mux))
 }
 
@@ -320,7 +327,7 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 		st := map[string]any{"url": "", "state": s.state, "mode": s.mode, "file": "", "bytes": 0, "seconds": 0, "upnp": "", "error": s.err, "progress": s.progress, "outDir": s.set.OutDir,
 			"count": s.count, "last": s.last, "lastBytes": s.lastBytes}
 		if q, ok := qualityByID(s.set.Quality); ok {
-			st["quality"], st["targetBitrate"] = q.Label, q.Bitrate
+			st["quality"], st["targetBitrate"] = q.ID, q.Bitrate
 		}
 		if s.file != nil {
 			st["file"], st["bytes"] = filepath.Base(s.file.Path()), s.file.Written()
@@ -354,6 +361,7 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 	})
 
 	s.settingsHandlers(mux)
+	s.localeHandlers(mux)
 	// Opens the licenses page or the source repository in the default browser
 	// (the app window has no navigation controls).
 	mux.HandleFunc("POST /api/open/{what}", func(w http.ResponseWriter, r *http.Request) {
@@ -384,7 +392,7 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		mux.ServeHTTP(w, r)
 	})

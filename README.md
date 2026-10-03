@@ -63,7 +63,7 @@ already on its disk.
 1. Build `dist/ghostcam.exe` (see [Build](#build)). It is the only file you need.
 2. Run it and allow it when the Windows firewall asks: this lets direct UDP connections in.
    On first launch it downloads `cloudflared` (~50 MB, see [Tunnel binary](#tunnel-binary-cloudflared)), so an Internet connection is required once.
-3. Scan the QR code with the phone and tap **Activer la caméra**, then the red button.
+3. Scan the QR code with the phone and tap **Enable camera**, then the red button.
 4. Videos are saved to `Videos\GhostCam` by default. Change the folder and quality with the settings button (top right).
 
 WebView2 is preinstalled on Windows 10/11. If it is missing, GhostCam opens the
@@ -116,8 +116,8 @@ official GitHub releases and installs or updates its own copy in
   previous version is kept.
 - `cloudflared` runs inside a Windows job object, so it dies with GhostCam,
   even on a crash or a forced kill.
-- The QR code appears only once the tunnel hostname resolves on public DNS
-  (checked against 1.1.1.1, so the router's DNS cache isn't polluted).
+- The QR code appears only once the phone page actually loads through the
+  tunnel (resolved with 1.1.1.1, so the router's DNS cache isn't polluted).
 
 `-cloudflared <path>` skips all of this and uses your own binary.
 
@@ -155,10 +155,10 @@ applied from the next video without reconnecting the phone.
 
 | Preset | Camera | Phone uplink needed | Disk |
 |---|---|---|---|
-| Économie | 480p 24 fps | ≈ 0.8 Mbit/s | ≈ 0.3 GB/h |
+| Economy | 480p 24 fps | ≈ 0.8 Mbit/s | ≈ 0.3 GB/h |
 | Standard (default) | 720p 30 fps | ≈ 2 Mbit/s | ≈ 0.8 GB/h |
-| Haute | 1080p 30 fps | ≈ 4 Mbit/s | ≈ 1.7 GB/h |
-| Maximale | 1080p 30 fps | ≈ 8 Mbit/s | ≈ 3.4 GB/h |
+| High | 1080p 30 fps | ≈ 4 Mbit/s | ≈ 1.7 GB/h |
+| Maximum | 1080p 30 fps | ≈ 8 Mbit/s | ≈ 3.4 GB/h |
 
 If the phone's uplink is slower than the preset needs:
 - **Direct:** the video stays real time but drops frames (`degradationPreference: maintain-resolution`).
@@ -197,6 +197,19 @@ Docker, only the encrypted relay (and sometimes STUN) works.
 
 Logs are written to `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
 
+## Languages
+
+The interface is available in **English** and **French**:
+- The phone page follows the phone's browser language.
+- The PC window follows the Windows language, or the choice made in Settings → *Language*.
+- Unknown languages fall back to English.
+
+Translations live in [`web/locales/`](web/locales), one file per language in
+**i18next JSON v4** format (nested keys, `{{variables}}`, CLDR plural forms such
+as `_one` / `_many` / `_other`). `en.json` is the source. The format works as is
+with Weblate, Crowdin, Lokalise and similar tools. To add a language, see
+[CONTRIBUTING.md](CONTRIBUTING.md#translations).
+
 ## Testing
 
 An end-to-end test runs a headless Chromium with a fake camera as the phone. It
@@ -208,6 +221,8 @@ docker compose run --rm build-linux
 MODE=webrtc docker compose run --rm e2e                   # direct path
 MODE=relay  docker compose run --rm e2e                   # UDP blocked: encrypted relay
 MODE=webrtc docker compose run --rm -e QUALITY2=high e2e  # quality going up instead of down
+LOCALE=en-US docker compose run --rm e2e                  # phone and PC window in English (default: fr-FR)
+docker compose run --rm i18n                              # translation files: keys, plurals, variables
 ```
 
 The test prints, for each file, the frame count and the resolution of the first
@@ -222,10 +237,12 @@ internal/record/     fsync'ed append-only file, live WebM muxer
 internal/pairing/    pairing secret, HMAC auth, AES-GCM frame decryption
 internal/tunnel/     cloudflared Quick Tunnel
 internal/upnp/       router port mapping + lease renewal
-web/                 phone page (index.html, app.js), PC window (admin.html), icon (embedded in the binary)
+web/                 phone page (index.html, app.js), PC window (admin.html), i18n.js, icon (embedded in the binary)
+web/locales/         translations, i18next JSON v4 (en.json = source)
 notices.go           embeds LICENSE + third_party_licenses.txt (shown in the app)
 scripts/             gen-notices.sh: regenerates third_party_licenses.txt
 test/e2e/            Playwright end-to-end test
+test/i18n/           translation consistency check
 ```
 
 ## Known issues and roadmap
@@ -238,7 +255,7 @@ Good places to start contributing:
 - **Self-hosted phone page**, to remove the trust in the tunnel for the JavaScript (see Security model).
 - **Native window on macOS and Linux.** These platforms currently fall back to the browser.
 - **Unit tests and CI.** Today there is only the end-to-end test.
-- **i18n.** The UI is in French only.
+- **More languages.** English and French are available: translations are welcome (see [Languages](#languages)).
 - **ICE restart** instead of a new file on short network drops.
 - **Seek index on stop**, by remuxing to add Cues so players can seek.
 

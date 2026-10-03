@@ -1,0 +1,167 @@
+{
+  "common": {
+    "mode": {
+      "direct": "Connexion directe",
+      "relay": "Relais chiffré"
+    },
+    "mb": "{{n}} Mo",
+    "gb": "{{n}} Go",
+    "mbps": "{{n}} Mbit/s"
+  },
+  "pc": {
+    "pill": {
+      "starting": "Démarrage",
+      "error": "Erreur",
+      "rec": "● REC",
+      "connected": "Connecté",
+      "waiting": "En attente",
+      "stopped": "Arrêtée"
+    },
+    "settingsButton": "Paramètres",
+    "starting": {
+      "title": "Démarrage de GhostCam…",
+      "sub": "Quelques secondes, le temps de rendre ce PC joignable depuis Internet."
+    },
+    "error": {
+      "title": "Impossible de démarrer"
+    },
+    "pair": {
+      "title": "Scannez avec le téléphone",
+      "sub": "Avec l'appareil photo, en 4G/5G ou en Wi-Fi.",
+      "sub2": "Rien n'est stocké sur le téléphone.",
+      "qrAlt": "QR code d'appairage"
+    },
+    "ready": {
+      "title": "Téléphone connecté",
+      "sub": "{{mode}} · appuyez sur le bouton rouge du téléphone pour filmer."
+    },
+    "live": {
+      "label": "Enregistrement sur ce PC",
+      "starting": "Démarrage…",
+      "rate": "Reçu : {{rate}} · cible {{target}} ({{quality}})",
+      "netWarn": "Le réseau du téléphone ne suit pas la qualité choisie : baissez-la dans les paramètres (prochaine vidéo)."
+    },
+    "history": {
+      "count_one": "{{count}} vidéo enregistrée",
+      "count_many": "{{count}} vidéos enregistrées",
+      "count_other": "{{count}} vidéos enregistrées",
+      "last": "Dernière : {{file}} · {{size}}"
+    },
+    "copy": {
+      "button": "Copier le lien",
+      "done": "Lien copié ✓",
+      "failed": "Copie impossible"
+    },
+    "openFolder": "Ouvrir les vidéos",
+    "foot": {
+      "upnp": "Port ouvert sur la box (UPnP) · connexion directe possible",
+      "dir": "Vidéos : {{dir}}"
+    },
+    "settings": {
+      "title": "Paramètres",
+      "back": "Retour",
+      "quality": "Qualité vidéo",
+      "folder": "Dossier des vidéos",
+      "browse": "Parcourir…",
+      "language": "Langue",
+      "languageAuto": "Automatique ({{lang}})",
+      "save": "Enregistrer",
+      "saved": "Enregistré ✓",
+      "appliesNext": "S'applique à la prochaine vidéo, sans reconnecter le téléphone.",
+      "licenses": "Licences open source",
+      "source": "Code source"
+    },
+    "quality": {
+      "meta": "{{height}}p · {{fps}} i/s · ≈ {{rate}} · ≈ {{perHour}} Go/heure",
+      "eco": {
+        "label": "Économie",
+        "risk": "Le plus sûr sur un réseau faible : le moins de retard."
+      },
+      "standard": {
+        "label": "Standard",
+        "risk": "Bon compromis netteté / fiabilité. Recommandé."
+      },
+      "high": {
+        "label": "Haute",
+        "risk": "Demande une bonne connexion montante. Sinon : vidéo saccadée ou retard."
+      },
+      "max": {
+        "label": "Maximale",
+        "risk": "Pour le Wi-Fi ou une très bonne 4G/5G. Risque élevé de retard sur réseau mobile."
+      },
+      "warnHot": "⚠ Risque de latence.",
+      "warnNeed": "Le téléphone doit pouvoir envoyer ≈ {{rate}} en continu.",
+      "warnIf": "Si sa connexion ne suit pas :",
+      "warnDirect": "Connexion directe : la vidéo reste en temps réel, mais devient saccadée (moins d'images par seconde) et la compression plus visible.",
+      "warnRelay": "Relais chiffré : la vidéo s'accumule sur le téléphone avant d'être envoyée. Ces secondes ne sont pas encore sur le PC et seraient perdues si le téléphone était détruit. Le téléphone affiche alors « Réseau lent »."
+    }
+  },
+  "phone": {
+    "intro": {
+      "text": "La vidéo est envoyée en direct sur votre PC et n'est jamais stockée sur ce téléphone.",
+      "go": "Activer la caméra",
+      "invalidLink": "Lien d'appairage invalide : scannez le QR code affiché sur le PC.",
+      "cameraError": "Caméra indisponible : {{detail}}"
+    },
+    "rec": {
+      "start": "Démarrer l'enregistrement",
+      "stop": "Arrêter l'enregistrement"
+    },
+    "info": {
+      "tap": "Appuyez pour filmer",
+      "count_one": "{{count}} vidéo enregistrée sur le PC",
+      "count_many": "{{count}} vidéos enregistrées sur le PC",
+      "count_other": "{{count}} vidéos enregistrées sur le PC",
+      "starting": "Démarrage…",
+      "recording": "Enregistrement sur le PC, rien n'est gardé ici"
+    },
+    "conn": {
+      "offline": "Hors ligne",
+      "connecting": "Connexion au PC…",
+      "connected": "Connecté au PC · {{mode}}",
+      "unstable": "Réseau instable…",
+      "slow": "Réseau lent · {{kb}} Ko en attente",
+      "noDirect": "Pas de chemin direct, essai du relais…",
+      "retry": "Reconnexion… ({{detail}})",
+      "lost": "Connexion perdue, reconnexion…",
+      "refused": "Connexion refusée : ce n'est pas votre PC"
+    },
+    "mode": {
+      "direct": "direct",
+      "relay": "relais chiffré"
+    },
+    "toast": {
+      "saved": "Vidéo enregistrée sur le PC",
+      "savedSize": "Vidéo enregistrée sur le PC · {{size}}",
+      "resumed": "Enregistrement repris (nouveau fichier)",
+      "lost": "Connexion perdue : ce qui a été filmé est déjà sur le PC",
+      "error": "Erreur : {{detail}}"
+    },
+    "err": {
+      "closed": "connexion fermée",
+      "unreachable": "serveur injoignable",
+      "noReply": "pas de réponse du PC",
+      "refused": "refusé par le PC",
+      "noRecorder": "MediaRecorder non supporté"
+    }
+  },
+  "progress": {
+    "cfFirst": "Premier lancement : téléchargement de cloudflared {{version}}…",
+    "cfUpdate": "Mise à jour de cloudflared {{from}} → {{to}}…",
+    "cfDownload": "Téléchargement de cloudflared {{version}}… {{done}} / {{total}} Mo",
+    "cfSignature": "Vérification de la signature de cloudflared…",
+    "tunnel": "Ouverture du lien sécurisé…",
+    "publicCheck": "Vérification du lien public…"
+  },
+  "error": {
+    "publicListener": "Le serveur public ({{addr}}) a échoué : {{detail}}",
+    "cloudflared": "Impossible de récupérer cloudflared (connexion Internet ?) : {{detail}}",
+    "tunnel": "Le tunnel Cloudflare a échoué : {{detail}}",
+    "unknownQuality": "Qualité inconnue",
+    "unknownLanguage": "Langue inconnue",
+    "dirNotAbsolute": "Le dossier doit être un chemin complet (ex. D:\\Vidéos\\GhostCam)",
+    "dirUnusable": "Dossier inutilisable : {{detail}}",
+    "badRequest": "Requête invalide",
+    "saveFailed": "Impossible d'enregistrer les paramètres : {{detail}}"
+  }
+}

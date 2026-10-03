@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -68,6 +68,7 @@
   .folder-row input { flex: 1; min-width: 0; font: 12.5px ui-monospace, Consolas, monospace; padding: 9px 10px; border-radius: 10px;
                       border: 1px solid var(--line); background: var(--card); color: var(--fg); user-select: text; }
   .folder-row button { flex: none; }
+  .folder-row select { flex: 1; font: inherit; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
   #msg { font-size: 13px; min-height: 18px; }
   #msg.err { color: var(--rec); } #msg.ok { color: var(--ok); }
   #net-warn { color: #d97706; font-size: 13px; margin-top: 10px; }
@@ -79,79 +80,86 @@
 <header>
   <img src="/icon.svg" width="26" height="26" alt="">
   <h1>GhostCam</h1>
-  <span class="pill" id="pill">Démarrage</span>
-  <button class="icon-btn" id="open-settings" aria-label="Paramètres" title="Paramètres">
+  <span class="pill" id="pill" data-i18n="pc.pill.starting">Starting</span>
+  <button class="icon-btn" id="open-settings" data-i18n-attr="aria-label:pc.settingsButton;title:pc.settingsButton">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="var(--card)"/><circle cx="15" cy="12" r="2" fill="var(--card)"/><circle cx="8" cy="18" r="2" fill="var(--card)"/></svg>
   </button>
 </header>
 
 <section class="card center" id="v-starting">
   <div class="spinner"></div>
-  <p class="title">Démarrage de GhostCam…</p>
-  <p class="sub" id="start-sub">Quelques secondes, le temps de rendre ce PC joignable depuis Internet.</p>
+  <p class="title" data-i18n="pc.starting.title">Starting GhostCam…</p>
+  <p class="sub" id="start-sub"></p>
 </section>
 
 <section class="card error" id="v-error" hidden>
-  <p class="title">Impossible de démarrer</p>
+  <p class="title" data-i18n="pc.error.title">Couldn't start</p>
   <p class="sub" id="err" style="color:inherit"></p>
 </section>
 
 <section class="card center" id="v-pair" hidden>
-  <p class="title">Scannez avec le téléphone</p>
-  <p class="sub">Avec l'appareil photo, en 4G/5G ou en Wi-Fi.<br>Rien n'est stocké sur le téléphone.</p>
-  <div id="qrbox"><img id="qr" alt="QR code d'appairage"></div>
+  <p class="title" data-i18n="pc.pair.title">Scan with your phone</p>
+  <p class="sub"><span data-i18n="pc.pair.sub"></span><br><span data-i18n="pc.pair.sub2"></span></p>
+  <div id="qrbox"><img id="qr" data-i18n-attr="alt:pc.pair.qrAlt" alt=""></div>
 </section>
 
 <section class="card center" id="v-ready" hidden>
   <div class="ready-icon">✓</div>
-  <p class="title">Téléphone connecté</p>
-  <p class="sub" id="ready-sub">Prêt à filmer : appuyez sur le bouton rouge du téléphone.</p>
+  <p class="title" data-i18n="pc.ready.title">Phone connected</p>
+  <p class="sub" id="ready-sub"></p>
 </section>
 
 <section class="card center" id="v-live" hidden>
-  <p class="sub" id="live-label"><span class="rec-dot"></span>&nbsp; Enregistrement sur ce PC</p>
+  <p class="sub"><span class="rec-dot"></span>&nbsp; <span data-i18n="pc.live.label"></span></p>
   <div class="timer" id="timer">00:00</div>
-  <div class="stats"><span id="size">0 Mo</span><span id="mode"></span></div>
+  <div class="stats"><span id="size"></span><span id="mode"></span></div>
   <div class="stats" style="margin-top:6px"><span id="rate"></span></div>
-  <div id="net-warn" hidden>Le réseau du téléphone ne suit pas la qualité choisie : baissez-la dans les paramètres (prochaine vidéo).</div>
+  <div id="net-warn" data-i18n="pc.live.netWarn" hidden></div>
   <div class="file" id="file"></div>
 </section>
 
 <section class="card" id="history" hidden></section>
 
 <div class="actions">
-  <button id="copy" hidden>Copier le lien</button>
-  <button id="folder" class="primary">Ouvrir les vidéos</button>
+  <button id="copy" data-i18n="pc.copy.button" hidden>Copy link</button>
+  <button id="folder" class="primary" data-i18n="pc.openFolder">Open videos</button>
 </div>
 <div class="foot" id="foot"></div>
 
 <section id="settings" hidden>
   <header>
-    <button class="icon-btn" id="close-settings" aria-label="Retour" title="Retour">
+    <button class="icon-btn" id="close-settings" data-i18n-attr="aria-label:pc.settings.back;title:pc.settings.back">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
-    <h1>Paramètres</h1>
+    <h1 data-i18n="pc.settings.title">Settings</h1>
   </header>
 
-  <h2>Qualité vidéo</h2>
+  <h2 data-i18n="pc.settings.quality">Video quality</h2>
   <div id="qualities" role="radiogroup" style="display:flex;flex-direction:column;gap:8px"></div>
   <div class="note" id="q-warn"></div>
 
-  <h2>Dossier des vidéos</h2>
+  <h2 data-i18n="pc.settings.folder">Videos folder</h2>
   <div class="folder-row">
-    <input id="dir" spellcheck="false" aria-label="Dossier des vidéos">
-    <button id="pick">Parcourir…</button>
+    <input id="dir" spellcheck="false" data-i18n-attr="aria-label:pc.settings.folder">
+    <button id="pick" data-i18n="pc.settings.browse">Browse…</button>
+  </div>
+
+  <h2 data-i18n="pc.settings.language">Language</h2>
+  <div class="folder-row">
+    <select id="lang" data-i18n-attr="aria-label:pc.settings.language"></select>
   </div>
 
   <div id="msg"></div>
   <div class="actions" style="margin-top:0">
-    <button id="save" class="primary">Enregistrer</button>
+    <button id="save" class="primary" data-i18n="pc.settings.save">Save</button>
   </div>
-  <p class="foot" style="margin:0">S'applique à la prochaine vidéo, sans reconnecter le téléphone.</p>
-  <p class="foot" style="margin:0"><a href="#" id="lnk-licenses">Licences open source</a> · <a href="#" id="lnk-source">Code source</a> · AGPL-3.0</p>
+  <p class="foot" style="margin:0" data-i18n="pc.settings.appliesNext"></p>
+  <p class="foot" style="margin:0"><a href="#" id="lnk-licenses" data-i18n="pc.settings.licenses"></a> · <a href="#" id="lnk-source" data-i18n="pc.settings.source"></a> · AGPL-3.0</p>
 </section>
 
+<script src="/i18n.js"></script>
 <script>
+  const { t } = I18N;
   const $ = (id) => document.getElementById(id);
   const views = ['v-starting', 'v-error', 'v-pair', 'v-ready', 'v-live'];
   const show = (v) => views.forEach((id) => { $(id).hidden = id !== v; });
@@ -159,30 +167,32 @@
     const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60, p = (n) => String(n).padStart(2, '0');
     return (h ? h + ':' : '') + p(m) + ':' + p(sec);
   };
-  const fmtSize = (b) => b < 1024 ** 3 ? (b / 1024 ** 2).toFixed(1) + ' Mo' : (b / 1024 ** 3).toFixed(2) + ' Go';
+  const fmtSize = (b) => (b < 1024 ** 3 ? t('common.mb', { n: I18N.num(b / 1024 ** 2, 1) }) : t('common.gb', { n: I18N.num(b / 1024 ** 3, 2) }));
+  const mbps = (bps) => t('common.mbps', { n: I18N.num(bps / 1e6, 1) });
+  const modeName = (m) => t(m === 'webrtc' ? 'common.mode.direct' : 'common.mode.relay');
+  const qualityName = (id) => t(`pc.quality.${id}.label`);
   let url = '', qrFor = '';
-  const mbps = (bps) => (bps / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' Mbit/s';
   let samples = [], lastFile = '';
 
   async function tick() {
     let s;
     try { s = await (await fetch('/api/status', { cache: 'no-store' })).json(); }
-    catch { $('pill').textContent = 'Arrêtée'; return; }
+    catch { $('pill').textContent = t('pc.pill.stopped'); return; }
     url = s.url;
     const pill = $('pill');
     pill.className = 'pill';
     $('copy').hidden = !url || s.state !== 'waiting';
 
     if (s.error) {
-      show('v-error'); $('err').textContent = s.error; pill.textContent = 'Erreur';
+      show('v-error'); $('err').textContent = I18N.msg(s.error); pill.textContent = t('pc.pill.error');
     } else if (!url) {
-      show('v-starting'); pill.textContent = 'Démarrage';
-      $('start-sub').textContent = s.progress || 'Quelques secondes, le temps de rendre ce PC joignable depuis Internet.';
+      show('v-starting'); pill.textContent = t('pc.pill.starting');
+      $('start-sub').textContent = s.progress ? I18N.msg(s.progress) : t('pc.starting.sub');
     } else if (s.state === 'recording') {
-      show('v-live'); pill.textContent = '● REC'; pill.className = 'pill live';
+      show('v-live'); pill.textContent = t('pc.pill.rec'); pill.className = 'pill live';
       $('timer').textContent = s.file ? fmtTime(s.seconds) : '00:00';
-      $('size').textContent = s.file ? fmtSize(s.bytes) : 'Démarrage…';
-      $('mode').textContent = s.mode === 'webrtc' ? 'Connexion directe' : 'Relais chiffré';
+      $('size').textContent = s.file ? fmtSize(s.bytes) : t('pc.live.starting');
+      $('mode').textContent = modeName(s.mode);
       $('file').textContent = s.file;
       // Received bitrate over the last ~4 s, compared with the chosen quality.
       if (s.file !== lastFile) { samples = []; lastFile = s.file; }
@@ -190,43 +200,35 @@
       if (samples.length > 5) samples.shift();
       const [t0, b0] = samples[0], [t1, b1] = samples[samples.length - 1];
       const rate = t1 > t0 ? ((b1 - b0) * 8 * 1000) / (t1 - t0) : 0;
-      $('rate').textContent = s.file && samples.length > 2 ? `Reçu : ${mbps(rate)} · cible ${mbps(s.targetBitrate)} (${s.quality})` : '';
+      $('rate').textContent = s.file && samples.length > 2
+        ? t('pc.live.rate', { rate: mbps(rate), target: mbps(s.targetBitrate), quality: qualityName(s.quality) }) : '';
       $('net-warn').hidden = !(s.file && s.seconds > 6 && samples.length >= 5 && rate < 0.5 * s.targetBitrate);
     } else if (s.state === 'connected') {
-      show('v-ready'); pill.textContent = 'Connecté';
-      $('ready-sub').textContent = (s.mode === 'webrtc' ? 'Connexion directe' : 'Relais chiffré') + ' · appuyez sur le bouton rouge du téléphone pour filmer.';
+      show('v-ready'); pill.textContent = t('pc.pill.connected');
+      $('ready-sub').textContent = t('pc.ready.sub', { mode: modeName(s.mode) });
     } else {
-      show('v-pair'); pill.textContent = 'En attente';
+      show('v-pair'); pill.textContent = t('pc.pill.waiting');
       if (qrFor !== url) { $('qr').src = '/qr.png?' + Date.now(); qrFor = url; }
     }
     $('history').hidden = !s.count;
     if (s.count) {
-      $('history').innerHTML = '';
-      const b = document.createElement('b');
-      b.textContent = s.count + (s.count > 1 ? ' vidéos enregistrées' : ' vidéo enregistrée');
-      const last = document.createElement('div');
-      last.className = 'file';
-      last.style.marginTop = '4px';
-      last.textContent = 'Dernière : ' + s.last + ' · ' + fmtSize(s.lastBytes);
-      $('history').append(b, last);
+      $('history').replaceChildren(
+        el('b', { textContent: t('pc.history.count', { count: s.count }) }),
+        el('div', { className: 'file', style: 'margin-top:4px', textContent: t('pc.history.last', { file: s.last, size: fmtSize(s.lastBytes) }) }),
+      );
     }
-    $('foot').textContent = s.upnp ? 'Port ouvert sur la box (UPnP) · connexion directe possible' : 'Vidéos : ' + s.outDir;
+    $('foot').textContent = s.upnp ? t('pc.foot.upnp') : t('pc.foot.dir', { dir: s.outDir });
   }
 
   $('copy').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(url); $('copy').textContent = 'Lien copié ✓'; }
-    catch { $('copy').textContent = 'Copie impossible'; }
-    setTimeout(() => { $('copy').textContent = 'Copier le lien'; }, 2000);
+    try { await navigator.clipboard.writeText(url); $('copy').textContent = t('pc.copy.done'); }
+    catch { $('copy').textContent = t('pc.copy.failed'); }
+    setTimeout(() => { $('copy').textContent = t('pc.copy.button'); }, 2000);
   });
   $('folder').addEventListener('click', () => fetch('/api/open-folder', { method: 'POST', headers: { 'X-GhostCam': '1' } }));
 
   // ------------------------------------------------------------ settings
-  const RISK = {
-    eco: [0, 'Le plus sûr sur un réseau faible : le moins de retard.'],
-    standard: [1, 'Bon compromis netteté / fiabilité. Recommandé.'],
-    high: [2, 'Demande une bonne connexion montante. Sinon : vidéo saccadée ou retard.'],
-    max: [3, 'Pour le Wi-Fi ou une très bonne 4G/5G. Risque élevé de retard sur réseau mobile.'],
-  };
+  const RISK = { eco: 0, standard: 1, high: 2, max: 3 };
   let cfg = null;
   const post = (path, body) => fetch(path, { method: 'POST', headers: { 'X-GhostCam': '1', 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
   const selected = () => (document.querySelector('input[name=q]:checked') || {}).value;
@@ -235,14 +237,14 @@
   function renderWarn() {
     const q = cfg.qualities.find((x) => x.id === selected());
     if (!q) return;
-    const hot = RISK[q.id] && RISK[q.id][0] >= 2;
+    const hot = (RISK[q.id] ?? 1) >= 2;
     $('q-warn').className = 'note' + (hot ? ' hot' : '');
     $('q-warn').replaceChildren(
-      el('b', { textContent: (hot ? '⚠ Risque de latence. ' : '') + `Le téléphone doit pouvoir envoyer ≈ ${mbps(q.bitrate)} en continu.` }),
-      el('div', { textContent: 'Si sa connexion ne suit pas :', style: 'margin-top:4px' }),
+      el('b', { textContent: (hot ? t('pc.quality.warnHot') + ' ' : '') + t('pc.quality.warnNeed', { rate: mbps(q.bitrate) }) }),
+      el('div', { textContent: t('pc.quality.warnIf'), style: 'margin-top:4px' }),
       el('ul', {},
-        el('li', { textContent: "Connexion directe : la vidéo reste en temps réel, mais devient saccadée (moins d'images par seconde) et la compression plus visible." }),
-        el('li', { textContent: "Relais chiffré : la vidéo s'accumule sur le téléphone avant d'être envoyée. Ces secondes ne sont pas encore sur le PC et seraient perdues si le téléphone était détruit. Le téléphone affiche alors « Réseau lent »." })),
+        el('li', { textContent: t('pc.quality.warnDirect') }),
+        el('li', { textContent: t('pc.quality.warnRelay') })),
     );
   }
 
@@ -252,15 +254,22 @@
     $('qualities').replaceChildren(...cfg.qualities.map((q) => {
       const input = el('input', { type: 'radio', name: 'q', value: q.id, checked: q.id === cfg.quality });
       input.addEventListener('change', renderWarn);
-      const perHour = ((q.bitrate * 3600) / 8 / 1024 ** 3).toLocaleString('fr-FR', { maximumFractionDigits: 1 });
-      const [lvl, txt] = RISK[q.id] || [1, ''];
+      const perHour = I18N.num((q.bitrate * 3600) / 8 / 1024 ** 3, 1);
       return el('label', { className: 'q' }, input, el('div', {},
-        el('b', { textContent: q.label }),
-        el('div', { className: 'meta', textContent: `${q.height}p · ${q.fps} i/s · ≈ ${mbps(q.bitrate)} · ≈ ${perHour} Go/heure` }),
-        el('div', { className: 'risk r' + lvl, textContent: txt })));
+        el('b', { textContent: qualityName(q.id) }),
+        el('div', { className: 'meta', textContent: t('pc.quality.meta', { height: q.height, fps: q.fps, rate: mbps(q.bitrate), perHour }) }),
+        el('div', { className: 'risk r' + (RISK[q.id] ?? 1), textContent: t(`pc.quality.${q.id}.risk`) })));
     }));
     $('dir').value = cfg.outDir;
     $('pick').hidden = !cfg.canPick;
+    // "Automatic" follows Windows; each language is named in its own language.
+    const auto = el('option', { value: '', textContent: t('pc.settings.languageAuto', { lang: I18N.name(I18N.lang) }) });
+    $('lang').replaceChildren(auto, ...cfg.locales.map((code) => {
+      let label = code;
+      try { label = new Intl.DisplayNames([code], { type: 'language' }).of(code); } catch {}
+      return el('option', { value: code, textContent: label.charAt(0).toUpperCase() + label.slice(1) });
+    }));
+    $('lang').value = cfg.language || '';
     renderWarn();
     $('settings').hidden = false;
   }
@@ -275,9 +284,16 @@
     } finally { $('pick').disabled = false; }
   });
   $('save').addEventListener('click', async () => {
-    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim() });
-    if (!r.ok) { $('msg').textContent = await r.text(); $('msg').className = 'err'; return; }
-    $('msg').textContent = 'Enregistré ✓'; $('msg').className = 'ok';
+    const language = $('lang').value;
+    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language });
+    if (!r.ok) {
+      let m = { key: 'error.badRequest' };
+      try { m = await r.json(); } catch {}
+      $('msg').textContent = I18N.msg(m); $('msg').className = 'err';
+      return;
+    }
+    $('msg').textContent = t('pc.settings.saved'); $('msg').className = 'ok';
+    if (language !== (cfg.language || '')) { setTimeout(() => location.reload(), 500); return; }
     setTimeout(() => { $('settings').hidden = true; }, 700);
   });
 
@@ -285,7 +301,12 @@
     $('lnk-' + what).addEventListener('click', (e) => { e.preventDefault(); post('/api/open/' + what); });
   }
 
-  tick(); setInterval(tick, 1000);
+  (async () => {
+    let language = '';
+    try { language = (await (await fetch('/api/settings', { cache: 'no-store' })).json()).language || ''; } catch {}
+    await I18N.init(language);
+    tick(); setInterval(tick, 1000);
+  })();
 </script>
 </body>
 </html>
