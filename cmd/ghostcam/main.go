@@ -156,7 +156,9 @@ func main() {
 	case runWindow(ctx, adminURL, filepath.Join(dataDir, "webview")):
 		// window closed by the user
 	default:
+		// No native window (macOS, Linux): the same page opens in the browser.
 		_ = openPath(adminURL)
+		fmt.Printf("\nGhostCam is running. Open %s in your browser if it didn't open.\nVideos: %s\nPress Ctrl+C to quit.\n\n", adminURL, settings.OutDir)
 		<-ctx.Done()
 	}
 
@@ -232,15 +234,24 @@ func waitReachable(ctx context.Context, base string, max time.Duration) {
 }
 
 func defaultOutDir() string {
-	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, "Videos", "GhostCam")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "recordings"
 	}
-	return "recordings"
+	if runtime.GOOS == "darwin" {
+		return filepath.Join(home, "Movies", "GhostCam")
+	}
+	return filepath.Join(home, "Videos", "GhostCam")
 }
 
-// appDataDir holds the log file and the WebView2 profile (%LOCALAPPDATA%\GhostCam).
+// appDataDir holds settings, logs, cloudflared and the WebView2 profile:
+// %LOCALAPPDATA%\GhostCam on Windows, ~/Library/Application Support/GhostCam
+// on macOS, ~/.config/GhostCam on Linux (not a cache dir, which may be wiped).
 func appDataDir() string {
-	base, err := os.UserCacheDir()
+	base, err := os.UserConfigDir()
+	if runtime.GOOS == "windows" {
+		base, err = os.UserCacheDir() // %LOCALAPPDATA%, unchanged since 1.0
+	}
 	if err != nil {
 		base = os.TempDir()
 	}

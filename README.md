@@ -20,22 +20,27 @@
 
 ## Get started in 3 steps
 
-**1. On your PC (Windows 10/11):** [download `ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe) and open it.
-If Windows SmartScreen says the app is unrecognized, click *More info → Run anyway*. When the firewall asks, click *Allow*.
+**1. On your computer:** download GhostCam and open it.
+
+- **Windows 10/11:** [`ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe). If SmartScreen says the app is unrecognized, click *More info → Run anyway*. When the firewall asks, click *Allow*.
+- **macOS** *(experimental)*: [Apple Silicon (M1 and later)](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-macos-apple-silicon) or [Intel](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-macos-intel). Then, in Terminal:
+  ```sh
+  cd ~/Downloads && chmod +x ghostcam-macos-* && xattr -c ghostcam-macos-* && ./ghostcam-macos-apple-silicon
+  ```
+  (use `./ghostcam-macos-intel` on an Intel Mac). The app opens in your browser.
+- **Linux** *(experimental)*: [x64](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-linux-x64) or [ARM64](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-linux-arm64). Then `chmod +x ghostcam-linux-x64 && ./ghostcam-linux-x64`. The app opens in your browser.
 
 **2. On your phone:** scan the QR code shown on the PC with the camera app, then tap **Enable camera**.
 It works on iPhone (Safari) and Android (Chrome), on 4G/5G or any Wi-Fi. Nothing to install.
 
 **3. Record:** tap the red button to start, and tap it again to stop. Do it as many times as you like.
-Each video is saved on the PC, in `Videos\GhostCam` (button **Open videos** in the app).
+Each video is saved on the computer, in `Videos/GhostCam` (`Movies/GhostCam` on a Mac). The **Open videos** button shows them.
 
 <p align="center">
   <img src="docs/screenshots/phone-recording.png" height="420" alt="Phone recording">
   &nbsp;&nbsp;
   <img src="docs/screenshots/pc-recording.png" height="420" alt="PC window while recording">
 </p>
-
-> macOS and Linux: experimental builds are planned for the next version.
 
 ### Good to know
 
@@ -46,10 +51,10 @@ Each video is saved on the PC, in `Videos\GhostCam` (button **Open videos** in t
 
 ### Troubleshooting
 
-- **The QR code doesn't appear:** the app window shows the reason. Check the PC's Internet connection. Logs are in `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
+- **The QR code doesn't appear:** the app shows the reason. Check the computer's Internet connection. Logs: `%LOCALAPPDATA%\GhostCam\ghostcam.log` (Windows), `~/Library/Application Support/GhostCam/ghostcam.log` (macOS), `~/.config/GhostCam/ghostcam.log` (Linux).
 - **The phone says "encrypted relay" instead of "direct":** this is normal and works fine. The direct mode is lighter; it needs UPnP enabled on your router.
 - **"Invalid pairing link" on the phone:** scan the QR code again. A new code is created each time the app starts.
-- **Something else?** [Open an issue](https://github.com/p3374/GhostCam/issues) with your phone model, browser and Windows version.
+- **Something else?** [Open an issue](https://github.com/p3374/GhostCam/issues) with your phone model, browser and computer OS.
 
 ---
 
@@ -199,6 +204,7 @@ Everything builds in Docker. Only Docker and Docker Compose are needed on the ho
 ```sh
 git clone https://github.com/p3374/GhostCam.git && cd GhostCam
 docker compose run --rm build-windows   # -> dist/ghostcam.exe (single file, license texts embedded)
+docker compose run --rm build-release   # -> every release binary (Windows, macOS, Linux) + SHA256SUMS.txt
 docker compose up dev                   # dev run in a container: QR code in the logs, admin UI on http://localhost:8081
 docker compose run --rm icons           # regenerate icons from web/icon.svg (PNG + Windows .syso resource)
 ```
@@ -226,7 +232,7 @@ Logs are written to `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
 
 The interface is available in **English** and **French**:
 - The phone page follows the phone's browser language.
-- The PC window follows the Windows language, or the choice made in Settings → *Language*.
+- The PC window follows the system language, or the choice made in Settings → *Language*.
 - Unknown languages fall back to English.
 
 Translations live in [`web/locales/`](web/locales), one file per language in
@@ -278,7 +284,7 @@ Good places to start contributing:
 - **iOS background.** iOS stops the camera when Safari goes to the background. The page reconnects with a fresh camera when it comes back, but this is not yet tested on a real iPhone.
 - **Relay resolution.** Lowering the quality is confirmed in direct mode. In relay mode, with Chromium's fake camera, MediaRecorder kept the native resolution. This needs checking on real phones.
 - **Self-hosted phone page**, to remove the trust in the tunnel for the JavaScript (see Security model).
-- **Native window on macOS and Linux.** These platforms currently fall back to the browser.
+- **macOS and Linux are experimental.** They use the browser instead of a native window. The macOS download path (cloudflared `.tgz`) is tested against Cloudflare's real archives, but GhostCam itself hasn't run on a real Mac yet: reports are welcome. The macOS binary isn't notarized, hence the `xattr` step.
 - **Unit tests and CI.** Today there is only the end-to-end test.
 - **More languages.** English and French are available: translations are welcome (see [Languages](#languages)).
 - **ICE restart** instead of a new file on short network drops.

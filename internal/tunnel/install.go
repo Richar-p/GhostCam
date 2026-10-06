@@ -25,8 +25,11 @@ const releasesAPI = "https://api.github.com/repos/cloudflare/cloudflared/release
 type release struct {
 	Tag    string
 	URL    string
-	SHA256 string
+	SHA256 string // of the downloaded asset
 	Size   int64
+	// For .tgz assets, Cloudflare's release notes list the checksum of the
+	// binary inside the archive (GitHub's digest covers the archive itself).
+	InnerSHA256 string
 }
 
 type installedInfo struct {
@@ -76,23 +79,39 @@ func Ensure(ctx context.Context, dir string, progress Progress) (string, error) 
 		progress("progress.cfFirst", map[string]any{"version": rel.Tag})
 	}
 	tmp := bin + ".download"
+	staged := tmp
 	err = download(ctx, rel, tmp, progress)
+	if err == nil && strings.HasSuffix(asset, ".tgz") {
+		// macOS assets are archives: the SHA-256 above covered the archive,
+		// extract the binary from it.
+		staged = bin + ".extracted"
+		err = extractTGZ(tmp, "cloudflared", staged)
+	}
 	if err == nil {
 		progress("progress.cfSignature", nil)
-		err = verifySignature(tmp)
+		err = verifySignature(staged)
+	}
+	var sum string
+	if err == nil {
+		sum, err = fileSHA256(staged)
+	}
+	if err == nil && rel.InnerSHA256 != "" && sum != rel.InnerSHA256 {
+		err = fmt.Errorf("extracted binary SHA-256 %s does not match release notes %s", sum, rel.InnerSHA256)
 	}
 	if err == nil {
-		err = os.Rename(tmp, bin)
+		err = os.Rename(staged, bin)
 	}
+	_ = os.Remove(tmp)
 	if err != nil {
-		_ = os.Remove(tmp)
+		_ = os.Remove(staged)
 		if haveCur {
 			log.Printf("cloudflared: update to %s failed (%v), keeping %s", rel.Tag, err, cur.Tag)
 			return bin, nil
 		}
 		return "", fmt.Errorf("install: %w", err)
 	}
-	b, _ := json.Marshal(installedInfo{Tag: rel.Tag, SHA256: rel.SHA256})
+	// Hash of the installed binary (not of the archive), re-checked at each launch.
+	b, _ := json.Marshal(installedInfo{Tag: rel.Tag, SHA256: sum})
 	if err := os.WriteFile(filepath.Join(dir, "cloudflared.json"), b, 0o600); err != nil {
 		return "", err
 	}
@@ -110,6 +129,10 @@ func assetName() (asset, exe string, err error) {
 		return "cloudflared-linux-amd64", "cloudflared", nil
 	case "linux/arm64":
 		return "cloudflared-linux-arm64", "cloudflared", nil
+	case "darwin/amd64":
+		return "cloudflared-darwin-amd64.tgz", "cloudflared", nil
+	case "darwin/arm64":
+		return "cloudflared-darwin-arm64.tgz", "cloudflared", nil
 	}
 	return "", "", fmt.Errorf("no automatic cloudflared download for %s/%s", runtime.GOOS, runtime.GOARCH)
 }
@@ -164,18 +187,27 @@ func latestRelease(ctx context.Context, asset string) (release, error) {
 		if m := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(asset) + `:\s*([0-9a-fA-F]{64})\s*$`).FindStringSubmatch(r.Body); m != nil {
 			notes = strings.ToLower(m[1])
 		}
-		switch {
-		case digest == "" && notes == "":
-			return release{}, errors.New("no published checksum for " + asset)
-		case digest != "" && notes != "" && digest != notes:
-			return release{}, errors.New("GitHub digest and release-notes checksum disagree for " + asset)
-		case digest == "":
-			digest = notes
+		inner := ""
+		if strings.HasSuffix(asset, ".tgz") {
+			// Two independent checks: archive vs GitHub, binary vs release notes.
+			if digest == "" {
+				return release{}, errors.New("no published checksum for " + asset)
+			}
+			inner = notes
+		} else {
+			switch {
+			case digest == "" && notes == "":
+				return release{}, errors.New("no published checksum for " + asset)
+			case digest != "" && notes != "" && digest != notes:
+				return release{}, errors.New("GitHub digest and release-notes checksum disagree for " + asset)
+			case digest == "":
+				digest = notes
+			}
 		}
 		if !strings.HasPrefix(a.URL, "https://github.com/cloudflare/cloudflared/releases/download/") {
 			return release{}, errors.New("unexpected download URL " + a.URL)
 		}
-		return release{Tag: r.TagName, URL: a.URL, SHA256: digest, Size: a.Size}, nil
+		return release{Tag: r.TagName, URL: a.URL, SHA256: digest, Size: a.Size, InnerSHA256: inner}, nil
 	}
 	return release{}, fmt.Errorf("asset %s not found in release %s", asset, r.TagName)
 }

@@ -20,22 +20,27 @@
 
 ## Démarrer en 3 étapes
 
-**1. Sur votre PC (Windows 10/11) :** [téléchargez `ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe) et ouvrez-le.
-Si Windows SmartScreen indique une application non reconnue, cliquez sur *Informations complémentaires → Exécuter quand même*. Quand le pare-feu le demande, cliquez sur *Autoriser*.
+**1. Sur votre ordinateur :** téléchargez GhostCam et ouvrez-le.
+
+- **Windows 10/11 :** [`ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe). Si SmartScreen indique une application non reconnue, cliquez sur *Informations complémentaires → Exécuter quand même*. Quand le pare-feu le demande, cliquez sur *Autoriser*.
+- **macOS** *(expérimental)* : [Apple Silicon (M1 et suivants)](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-macos-apple-silicon) ou [Intel](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-macos-intel). Puis, dans le Terminal :
+  ```sh
+  cd ~/Downloads && chmod +x ghostcam-macos-* && xattr -c ghostcam-macos-* && ./ghostcam-macos-apple-silicon
+  ```
+  (utilisez `./ghostcam-macos-intel` sur un Mac Intel). L'app s'ouvre dans votre navigateur.
+- **Linux** *(expérimental)* : [x64](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-linux-x64) ou [ARM64](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-linux-arm64). Puis `chmod +x ghostcam-linux-x64 && ./ghostcam-linux-x64`. L'app s'ouvre dans votre navigateur.
 
 **2. Sur votre téléphone :** scannez le QR code affiché sur le PC avec l'appareil photo, puis appuyez sur **Activer la caméra**.
 Ça marche sur iPhone (Safari) et Android (Chrome), en 4G/5G ou sur n'importe quel Wi-Fi. Rien à installer.
 
 **3. Filmez :** appuyez sur le bouton rouge pour démarrer, et appuyez de nouveau pour arrêter. Autant de fois que vous voulez.
-Chaque vidéo est enregistrée sur le PC, dans `Vidéos\GhostCam` (bouton **Ouvrir les vidéos** dans l'app).
+Chaque vidéo est enregistrée sur l'ordinateur, dans `Vidéos/GhostCam` (`Films/GhostCam` sur Mac). Le bouton **Ouvrir les vidéos** les affiche.
 
 <p align="center">
   <img src="docs/screenshots/phone-recording.png" height="420" alt="Téléphone en enregistrement">
   &nbsp;&nbsp;
   <img src="docs/screenshots/pc-recording.png" height="420" alt="Fenêtre PC pendant l'enregistrement">
 </p>
-
-> macOS et Linux : des versions expérimentales sont prévues pour la prochaine version.
 
 ### Bon à savoir
 
@@ -46,10 +51,10 @@ Chaque vidéo est enregistrée sur le PC, dans `Vidéos\GhostCam` (bouton **Ouvr
 
 ### Problèmes courants
 
-- **Le QR code n'apparaît pas :** la fenêtre de l'app en indique la raison. Vérifiez la connexion Internet du PC. Les logs sont dans `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
+- **Le QR code n'apparaît pas :** l'app en indique la raison. Vérifiez la connexion Internet de l'ordinateur. Logs : `%LOCALAPPDATA%\GhostCam\ghostcam.log` (Windows), `~/Library/Application Support/GhostCam/ghostcam.log` (macOS), `~/.config/GhostCam/ghostcam.log` (Linux).
 - **Le téléphone affiche « relais chiffré » au lieu de « direct » :** c'est normal et ça fonctionne. Le mode direct est plus léger ; il demande l'UPnP activé sur votre box.
 - **« Lien d'appairage invalide » sur le téléphone :** scannez de nouveau le QR code. Un nouveau code est créé à chaque lancement de l'app.
-- **Autre chose ?** [Ouvrez une issue](https://github.com/p3374/GhostCam/issues) en indiquant votre modèle de téléphone, votre navigateur et votre version de Windows.
+- **Autre chose ?** [Ouvrez une issue](https://github.com/p3374/GhostCam/issues) en indiquant votre modèle de téléphone, votre navigateur et le système de votre ordinateur.
 
 ---
 
@@ -208,6 +213,7 @@ Tout se compile dans Docker. Il suffit d'avoir Docker et Docker Compose sur la m
 ```sh
 git clone https://github.com/p3374/GhostCam.git && cd GhostCam
 docker compose run --rm build-windows   # -> dist/ghostcam.exe (un seul fichier, licences intégrées)
+docker compose run --rm build-release   # -> tous les binaires de release (Windows, macOS, Linux) + SHA256SUMS.txt
 docker compose up dev                   # dev dans un conteneur : QR code dans les logs, admin sur http://localhost:8081
 docker compose run --rm icons           # régénère les icônes depuis web/icon.svg (PNG + ressource Windows .syso)
 ```
@@ -236,7 +242,7 @@ Les logs sont écrits dans `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
 
 L'interface est disponible en **anglais** et en **français** :
 - La page du téléphone suit la langue de son navigateur.
-- La fenêtre PC suit la langue de Windows, ou le choix fait dans Paramètres → *Langue*.
+- La fenêtre PC suit la langue du système, ou le choix fait dans Paramètres → *Langue*.
 - Pour une langue non disponible, l'anglais est utilisé.
 
 Les traductions sont dans [`web/locales/`](web/locales), un fichier par langue
@@ -291,7 +297,7 @@ Bons points d'entrée pour contribuer :
 - **iOS en arrière-plan.** iOS coupe la caméra quand Safari passe en arrière-plan. La page se reconnecte avec une caméra relancée à son retour, mais ce n'est pas encore testé sur un vrai iPhone.
 - **Résolution en mode relais.** La baisse de qualité est confirmée en mode direct. En mode relais, avec la fausse caméra de Chromium, MediaRecorder a gardé la résolution native. C'est à vérifier sur de vrais téléphones.
 - **Page du téléphone auto-hébergée**, pour ne plus avoir à faire confiance au tunnel pour le JavaScript (voir le Modèle de sécurité).
-- **Fenêtre native sur macOS et Linux.** Ces plateformes utilisent pour l'instant le navigateur.
+- **macOS et Linux sont expérimentaux.** Ils utilisent le navigateur au lieu d'une fenêtre native. Le téléchargement de cloudflared pour macOS (archive `.tgz`) est testé sur les vraies archives de Cloudflare, mais GhostCam n'a pas encore tourné sur un vrai Mac : les retours sont bienvenus. Le binaire macOS n'est pas notarisé, d'où l'étape `xattr`.
 - **Tests unitaires et CI.** Il n'y a aujourd'hui que le test de bout en bout.
 - **Plus de langues.** L'anglais et le français sont disponibles : les traductions sont les bienvenues (voir [Langues](#langues)).
 - **ICE restart**, plutôt qu'un nouveau fichier lors des coupures réseau courtes.

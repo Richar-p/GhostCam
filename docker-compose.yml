@@ -34,6 +34,17 @@ services:
         rm -rf /out/cloudflared.exe /out/LICENSE.txt /out/licenses &&
         ls -lh /out/ghostcam.exe
 
+  # docker compose run --rm build-release  -> every release binary + SHA256SUMS.txt in dist/
+  build-release:
+    build: { context: ., target: release }
+    profiles: ["build"]
+    volumes:
+      - .:/src
+      - ./dist:/out
+      - gomod:/go/pkg/mod
+      - gocache:/root/.cache/go-build
+    command: sh scripts/build-release.sh
+
   # docker compose run --rm build-linux && MODE=webrtc|relay docker compose run --rm e2e
   build-linux:
     build: { context: ., target: base }
