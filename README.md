@@ -18,13 +18,42 @@
   Nothing is ever stored on the phone.
 </p>
 
+## Get started in 3 steps
+
+**1. On your PC (Windows 10/11):** [download `ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe) and open it.
+If Windows SmartScreen says the app is unrecognized, click *More info → Run anyway*. When the firewall asks, click *Allow*.
+
+**2. On your phone:** scan the QR code shown on the PC with the camera app, then tap **Enable camera**.
+It works on iPhone (Safari) and Android (Chrome), on 4G/5G or any Wi-Fi. Nothing to install.
+
+**3. Record:** tap the red button to start, and tap it again to stop. Do it as many times as you like.
+Each video is saved on the PC, in `Videos\GhostCam` (button **Open videos** in the app).
+
 <p align="center">
   <img src="docs/screenshots/phone-recording.png" height="420" alt="Phone recording">
   &nbsp;&nbsp;
   <img src="docs/screenshots/pc-recording.png" height="420" alt="PC window while recording">
 </p>
 
+> macOS and Linux: experimental builds are planned for the next version.
+
+### Good to know
+
+- **Nothing is stored on the phone.** Every second filmed is already on the PC. If the phone is lost, broken or switched off mid-video, the file stays readable.
+- **Slow mobile network?** Choose **Economy** in the settings (top right button) to get less delay.
+- **Keep the camera page open** on the phone: on iPhone, switching to another app stops the camera.
+- **First launch:** the app downloads the Cloudflare connector (~50 MB), so the PC needs an Internet connection once.
+
+### Troubleshooting
+
+- **The QR code doesn't appear:** the app window shows the reason. Check the PC's Internet connection. Logs are in `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
+- **The phone says "encrypted relay" instead of "direct":** this is normal and works fine. The direct mode is lighter; it needs UPnP enabled on your router.
+- **"Invalid pairing link" on the phone:** scan the QR code again. A new code is created each time the app starts.
+- **Something else?** [Open an issue](https://github.com/p3374/GhostCam/issues) with your phone model, browser and Windows version.
+
 ---
+
+# Under the hood
 
 ## Why GhostCam?
 
@@ -57,14 +86,6 @@ already on its disk.
   &nbsp;
   <img src="docs/screenshots/phone-intro.png" height="380" alt="Phone intro">
 </p>
-
-## Quick start (Windows)
-
-1. Build `dist/ghostcam.exe` (see [Build](#build)). It is the only file you need.
-2. Run it and allow it when the Windows firewall asks: this lets direct UDP connections in.
-   On first launch it downloads `cloudflared` (~50 MB, see [Tunnel binary](#tunnel-binary-cloudflared)), so an Internet connection is required once.
-3. Scan the QR code with the phone and tap **Enable camera**, then the red button.
-4. Videos are saved to `Videos\GhostCam` by default. Change the folder and quality with the settings button (top right).
 
 WebView2 is preinstalled on Windows 10/11. If it is missing, GhostCam opens the
 same page in your default browser.
@@ -166,6 +187,10 @@ If the phone's uplink is slower than the preset needs:
 
 The PC window shows the received bitrate and warns when it falls below half the
 target.
+
+---
+
+# For developers
 
 ## Build
 
