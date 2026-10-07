@@ -45,7 +45,7 @@ Chaque vidéo est enregistrée sur l'ordinateur, dans `Vidéos/GhostCam` (`Films
 ### Bon à savoir
 
 - **Rien n'est stocké sur le téléphone.** Chaque seconde filmée est déjà sur le PC. Si le téléphone est perdu, cassé ou éteint en pleine vidéo, le fichier reste lisible.
-- **Réseau mobile lent ?** Choisissez **Économie** dans les paramètres (bouton en haut à droite) pour avoir moins de retard.
+- **Réseau mobile lent ?** Choisissez **Économie** dans les paramètres (bouton en haut à droite), ou activez le **tampon réseau** pour que les coupures courtes ne figent plus la vidéo.
 - **Gardez la page caméra ouverte** sur le téléphone : sur iPhone, passer à une autre app coupe la caméra.
 - **Premier lancement :** l'app télécharge le connecteur Cloudflare (environ 50 Mo), le PC doit donc être connecté à Internet une fois.
 
@@ -202,6 +202,24 @@ Si le débit montant du téléphone est inférieur à ce que demande le prérég
 La fenêtre du PC affiche le débit reçu et prévient quand il tombe sous la moitié
 de la cible.
 
+### Tampon réseau
+
+Désactivé par défaut (temps réel). Avec un tampon de 5, 15 ou 30 s (Paramètres),
+le téléphone enregistre avec `MediaRecorder` à pleine fluidité et envoie les
+morceaux par un canal fiable (le DataChannel WebRTC, ou le relais chiffré) :
+
+- Une coupure réseau **retarde** la vidéo au lieu de la figer.
+- Les morceaux en attente restent **uniquement en mémoire** dans la page, jamais
+  dans le stockage du téléphone. Ils seraient perdus si le téléphone était
+  détruit, c'est pourquoi le tampon est à activer volontairement.
+- Le téléphone et le PC affichent le retard. En mode relais, il est mesuré à
+  partir des accusés de réception du PC, car la page ne voit pas les tampons TCP du système.
+- Quand le retard dépasse le tampon, le téléphone baisse la qualité d'un cran,
+  dans un nouveau fichier. Si même Économie est trop lourd pour le réseau, le
+  retard continue d'augmenter, et l'affichage l'indique.
+- L'arrêt est immédiat : les dernières secondes continuent de partir en
+  arrière-plan, et le téléphone confirme quand le PC a tout reçu.
+
 ---
 
 # Pour les développeurs
@@ -266,6 +284,8 @@ MODE=webrtc docker compose run --rm e2e                   # chemin direct
 MODE=relay  docker compose run --rm e2e                   # UDP bloqué : relais chiffré
 MODE=webrtc docker compose run --rm -e QUALITY2=high e2e  # qualité en hausse plutôt qu'en baisse
 LOCALE=en-US docker compose run --rm e2e                  # téléphone et fenêtre PC en anglais (défaut : fr-FR)
+BUFFER=5 docker compose run --rm e2e                      # tampon réseau activé
+BUFFER=5 RATE=300kbit QUALITY1=high docker compose run --rm e2e  # réseau bridé : retard, baisse de qualité, rien de perdu
 docker compose run --rm i18n                              # fichiers de traduction : clés, pluriels, variables
 ```
 

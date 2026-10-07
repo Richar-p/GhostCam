@@ -45,7 +45,7 @@ Each video is saved on the computer, in `Videos/GhostCam` (`Movies/GhostCam` on 
 ### Good to know
 
 - **Nothing is stored on the phone.** Every second filmed is already on the PC. If the phone is lost, broken or switched off mid-video, the file stays readable.
-- **Slow mobile network?** Choose **Economy** in the settings (top right button) to get less delay.
+- **Slow mobile network?** Choose **Economy** in the settings (top right button), or turn on the **network buffer** so short drops don't freeze the video.
 - **Keep the camera page open** on the phone: on iPhone, switching to another app stops the camera.
 - **First launch:** the app downloads the Cloudflare connector (~50 MB), so the PC needs an Internet connection once.
 
@@ -193,6 +193,23 @@ If the phone's uplink is slower than the preset needs:
 The PC window shows the received bitrate and warns when it falls below half the
 target.
 
+### Network buffer
+
+Off by default (real time). With a buffer of 5, 15 or 30 s (Settings), the phone
+records with `MediaRecorder` at full frame rate and sends the chunks over a
+reliable channel (the WebRTC DataChannel, or the encrypted relay):
+
+- A network drop **delays** the video instead of freezing it.
+- Waiting chunks stay in the page's **memory only**, never in the phone's storage.
+  They would be lost if the phone were destroyed, which is why the buffer is opt-in.
+- The phone and the PC show the current delay. In relay mode it is measured
+  from the PC's acknowledgements, because the OS's TCP buffers are invisible to the page.
+- When the delay exceeds the buffer, the phone lowers the quality one step,
+  in a new file. If even Economy is too much for the network, the delay keeps
+  growing, and the display says so.
+- Stopping is immediate: the remaining seconds keep flowing in the background,
+  and the phone confirms when the PC has everything.
+
 ---
 
 # For developers
@@ -253,6 +270,8 @@ MODE=webrtc docker compose run --rm e2e                   # direct path
 MODE=relay  docker compose run --rm e2e                   # UDP blocked: encrypted relay
 MODE=webrtc docker compose run --rm -e QUALITY2=high e2e  # quality going up instead of down
 LOCALE=en-US docker compose run --rm e2e                  # phone and PC window in English (default: fr-FR)
+BUFFER=5 docker compose run --rm e2e                      # network buffer on
+BUFFER=5 RATE=300kbit QUALITY1=high docker compose run --rm e2e  # throttled network: delay, quality steps down, nothing lost
 docker compose run --rm i18n                              # translation files: keys, plurals, variables
 ```
 

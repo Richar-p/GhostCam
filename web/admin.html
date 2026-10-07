@@ -138,6 +138,12 @@
   <div id="qualities" role="radiogroup" style="display:flex;flex-direction:column;gap:8px"></div>
   <div class="note" id="q-warn"></div>
 
+  <h2 data-i18n="pc.settings.buffer">Network buffer</h2>
+  <div class="folder-row">
+    <select id="buffer" data-i18n-attr="aria-label:pc.settings.buffer"></select>
+  </div>
+  <div class="note" id="buffer-help"></div>
+
   <h2 data-i18n="pc.settings.folder">Videos folder</h2>
   <div class="folder-row">
     <input id="dir" spellcheck="false" data-i18n-attr="aria-label:pc.settings.folder">
@@ -192,7 +198,7 @@
       show('v-live'); pill.textContent = t('pc.pill.rec'); pill.className = 'pill live';
       $('timer').textContent = s.file ? fmtTime(s.seconds) : '00:00';
       $('size').textContent = s.file ? fmtSize(s.bytes) : t('pc.live.starting');
-      $('mode').textContent = modeName(s.mode);
+      $('mode').textContent = s.buffered ? t('pc.live.buffered', { mode: modeName(s.mode) }) : modeName(s.mode);
       $('file').textContent = s.file;
       // Received bitrate over the last ~4 s, compared with the chosen quality.
       if (s.file !== lastFile) { samples = []; lastFile = s.file; }
@@ -200,9 +206,10 @@
       if (samples.length > 5) samples.shift();
       const [t0, b0] = samples[0], [t1, b1] = samples[samples.length - 1];
       const rate = t1 > t0 ? ((b1 - b0) * 8 * 1000) / (t1 - t0) : 0;
+      const lag = s.buffered && s.lag >= 1 ? ' · ' + t('pc.live.lag', { n: Math.round(s.lag) }) : '';
       $('rate').textContent = s.file && samples.length > 2
-        ? t('pc.live.rate', { rate: mbps(rate), target: mbps(s.targetBitrate), quality: qualityName(s.quality) }) : '';
-      $('net-warn').hidden = !(s.file && s.seconds > 6 && samples.length >= 5 && rate < 0.5 * s.targetBitrate);
+        ? t('pc.live.rate', { rate: mbps(rate), target: mbps(s.targetBitrate), quality: qualityName(s.quality) }) + lag : '';
+      $('net-warn').hidden = !(s.file && s.seconds > 6 && samples.length >= 5 && rate < 0.5 * s.targetBitrate && !s.buffered);
     } else if (s.state === 'connected') {
       show('v-ready'); pill.textContent = t('pc.pill.connected');
       $('ready-sub').textContent = t('pc.ready.sub', { mode: modeName(s.mode) });
@@ -248,6 +255,12 @@
     );
   }
 
+  function renderBufferHelp() {
+    const n = Number($('buffer').value);
+    $('buffer-help').textContent = n ? t('pc.buffer.helpOn', { n }) : t('pc.buffer.helpOff');
+    $('buffer-help').className = 'note' + (n >= 15 ? ' hot' : '');
+  }
+
   async function openSettings() {
     $('msg').textContent = ''; $('msg').className = '';
     cfg = await (await fetch('/api/settings', { cache: 'no-store' })).json();
@@ -270,11 +283,15 @@
       return el('option', { value: code, textContent: label.charAt(0).toUpperCase() + label.slice(1) });
     }));
     $('lang').value = cfg.language || '';
+    $('buffer').replaceChildren(...(cfg.buffers || [0]).map((n) => el('option', { value: String(n), textContent: n ? t('pc.buffer.seconds', { n }) : t('pc.buffer.off') })));
+    $('buffer').value = String(cfg.buffer || 0);
+    renderBufferHelp();
     renderWarn();
     $('settings').hidden = false;
   }
 
   $('open-settings').addEventListener('click', openSettings);
+  $('buffer').addEventListener('change', renderBufferHelp);
   $('close-settings').addEventListener('click', () => { $('settings').hidden = true; });
   $('pick').addEventListener('click', async () => {
     $('pick').disabled = true;
@@ -285,7 +302,7 @@
   });
   $('save').addEventListener('click', async () => {
     const language = $('lang').value;
-    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language });
+    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language, buffer: Number($('buffer').value) });
     if (!r.ok) {
       let m = { key: 'error.badRequest' };
       try { m = await r.json(); } catch {}

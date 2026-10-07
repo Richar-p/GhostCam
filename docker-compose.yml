@@ -61,6 +61,10 @@ services:
     environment:
       MODE: ${MODE:-webrtc}
       LOCALE: ${LOCALE:-fr-FR}
+      BUFFER: ${BUFFER:-0}
+      RATE: ${RATE:-}
+      QUALITY1: ${QUALITY1:-standard}
+    cap_add: [NET_ADMIN] # RATE: netem rate limit on the container's loopback
     volumes:
       - .:/src
     command: sh -c "cp /src/test/e2e/run.mjs /e2e/ && node /e2e/run.mjs"

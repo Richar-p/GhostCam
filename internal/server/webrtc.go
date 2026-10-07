@@ -93,10 +93,13 @@ type answerMsg struct {
 // ctrlMsg travels on the "control" DataChannel. It is DTLS-protected end to
 // end (pinned fingerprint + MAC'ed offer), so neither side can be spoofed.
 type ctrlMsg struct {
-	Type    string   `json:"type"` // phone: start | stop ; PC: started | stopped
+	Type    string   `json:"type"` // phone: start | stop | lag ; PC: started | stopped
 	File    string   `json:"file,omitempty"`
 	Bytes   int64    `json:"bytes,omitempty"`
 	Quality *Quality `json:"quality,omitempty"` // with "started": applied by the phone
+	Buffer  *int     `json:"buffer,omitempty"`  // with "started" and "config"
+	Seconds float64  `json:"seconds,omitempty"` // "lag": buffered video still in the phone's memory
+	ID      string   `json:"id,omitempty"`      // "stopped": echoes the id of the buffered stop frame
 }
 
 // runWebRTC keeps one PeerConnection per pairing. Media flows only while the
@@ -110,10 +113,12 @@ func (s *Server) runWebRTC(ctx context.Context, c *websocket.Conn, offer string)
 		return err
 	}
 	defer pc.Close()
+	defer s.setOnSettings(nil)
 
 	var (
 		recMu     sync.Mutex
-		rec       *record.WebM
+		rec       *record.WebM // real-time mode: RTP muxed into WebM here
+		buf       *record.File // buffered mode: the phone's MediaRecorder stream
 		videoSSRC atomic.Uint32
 	)
 	current := func() *record.WebM {
@@ -128,14 +133,21 @@ func (s *Server) runWebRTC(ctx context.Context, c *websocket.Conn, offer string)
 	}
 	stopRec := func() (string, int64) {
 		recMu.Lock()
-		r := rec
-		rec = nil
+		r, f := rec, buf
+		rec, buf = nil, nil
 		recMu.Unlock()
-		if r == nil {
+		var path string
+		var n int64
+		switch {
+		case r != nil:
+			_ = r.Close()
+			path, n = r.Info()
+		case f != nil:
+			_ = f.Close()
+			path, n = f.Path(), f.Written()
+		default:
 			return "", 0
 		}
-		_ = r.Close()
-		path, n := r.Info()
 		s.recorded(path, n)
 		return path, n
 	}
@@ -157,15 +169,66 @@ func (s *Server) runWebRTC(ctx context.Context, c *websocket.Conn, offer string)
 			b, _ := json.Marshal(m)
 			_ = dc.SendText(string(b))
 		}
-		dc.OnOpen(func() { connOnce.Do(func() { close(connected) }) })
+		dc.OnOpen(func() {
+			connOnce.Do(func() { close(connected) })
+			// Settings changed on the PC: the phone applies them from the next video.
+			s.setOnSettings(func() {
+				q, b := s.quality(), s.settings().Buffer
+				reply(ctrlMsg{Type: "config", Quality: &q, Buffer: &b})
+			})
+		})
+		stopAndReply := func(id string) {
+			path, n := stopRec()
+			s.setStatus("connected", "webrtc", nil)
+			reply(ctrlMsg{Type: "stopped", File: filepath.Base(path), Bytes: n, ID: id})
+		}
 		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+			// Buffered mode: binary frames, same types as the relay (start with
+			// the MediaRecorder MIME type, data, stop). Control and media share
+			// one message type so their order is guaranteed: mixing text and
+			// binary messages on the channel did not preserve it in practice.
+			if !msg.IsString {
+				if len(msg.Data) == 0 {
+					return
+				}
+				switch msg.Data[0] {
+				case frameData:
+					recMu.Lock()
+					f := buf
+					recMu.Unlock()
+					if f != nil {
+						if _, err := f.Write(msg.Data[1:]); err != nil {
+							log.Printf("webrtc: buffered write: %v", err)
+						}
+					}
+				case frameStart:
+					stopRec()
+					f, err := createForMime(s.outDir(), "webrtc", string(msg.Data[1:]))
+					if err != nil {
+						log.Printf("webrtc: buffered start: %v", err)
+						return
+					}
+					log.Printf("recording to %s (buffered)", f.Path())
+					recMu.Lock()
+					buf = f
+					recMu.Unlock()
+					s.setStatus("recording", "webrtc", f)
+					s.setBuffered(true)
+					q, b := s.quality(), s.settings().Buffer
+					reply(ctrlMsg{Type: "started", Quality: &q, Buffer: &b})
+				case frameStop:
+					stopAndReply(string(msg.Data[1:]))
+				}
+				return
+			}
 			var m ctrlMsg
 			if json.Unmarshal(msg.Data, &m) != nil {
 				return
 			}
 			switch m.Type {
-			case "start":
+			case "start": // real-time mode: RTP tracks
 				stopRec()
+				q, b := s.quality(), s.settings().Buffer
 				r := record.NewWebM(s.outDir(), func(f *record.File) {
 					log.Printf("recording to %s", f.Path())
 					s.setStatus("recording", "webrtc", f)
@@ -175,12 +238,11 @@ func (s *Server) runWebRTC(ctx context.Context, c *websocket.Conn, offer string)
 				recMu.Unlock()
 				s.setStatus("recording", "webrtc", nil)
 				keyframe() // start the file now, not at the next periodic keyframe
-				q := s.quality()
-				reply(ctrlMsg{Type: "started", Quality: &q})
+				reply(ctrlMsg{Type: "started", Quality: &q, Buffer: &b})
 			case "stop":
-				path, n := stopRec()
-				s.setStatus("connected", "webrtc", nil)
-				reply(ctrlMsg{Type: "stopped", File: filepath.Base(path), Bytes: n})
+				stopAndReply("")
+			case "lag":
+				s.setLag(m.Seconds)
 			}
 		})
 	})

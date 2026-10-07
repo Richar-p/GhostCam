@@ -44,8 +44,16 @@ func qualityByID(id string) (Quality, bool) {
 type Settings struct {
 	Quality  string `json:"quality"`
 	OutDir   string `json:"outDir"`
-	Language string `json:"language"` // PC window language; "" = follow Windows
+	Language string `json:"language"` // PC window language; "" = follow the system
+	// Buffer is the phone-side buffer in seconds (0 = real time). Above 0 the
+	// phone sends its MediaRecorder stream over a reliable channel: network
+	// drops delay the video instead of freezing it. The buffer lives in the
+	// phone's RAM only, never in its storage.
+	Buffer int `json:"buffer"`
 }
+
+// buffers are the allowed Settings.Buffer values, in seconds.
+var buffers = []int{0, 5, 15, 30}
 
 // LoadSettings reads the settings file; missing or invalid values fall back to def.
 func LoadSettings(path string, def Settings) Settings {
@@ -62,7 +70,18 @@ func LoadSettings(path string, def Settings) Settings {
 	if s.OutDir == "" || !filepath.IsAbs(s.OutDir) {
 		s.OutDir = def.OutDir
 	}
+	if !slices.Contains(buffers, s.Buffer) {
+		s.Buffer = 0
+	}
 	return s
+}
+
+// setOnSettings registers a callback run after the settings change, so the
+// connected phone applies them from its next video (nil to unregister).
+func (s *Server) setOnSettings(fn func()) {
+	s.mu.Lock()
+	s.onSettings = fn
+	s.mu.Unlock()
 }
 
 func (s *Server) settings() Settings {
@@ -86,6 +105,9 @@ func (s *Server) updateSettings(n Settings) error {
 	if n.Language != "" && !slices.Contains(s.locales(), n.Language) {
 		return keyErr("error.unknownLanguage", nil)
 	}
+	if !slices.Contains(buffers, n.Buffer) {
+		return keyErr("error.badRequest", nil)
+	}
 	n.OutDir = filepath.Clean(n.OutDir)
 	if !filepath.IsAbs(n.OutDir) {
 		return keyErr("error.dirNotAbsolute", nil)
@@ -95,7 +117,11 @@ func (s *Server) updateSettings(n Settings) error {
 	}
 	s.mu.Lock()
 	s.set = n
+	notify := s.onSettings
 	s.mu.Unlock()
+	if notify != nil {
+		notify()
+	}
 	if s.cfg.SettingsPath == "" {
 		return nil
 	}
@@ -126,6 +152,7 @@ func (s *Server) settingsHandlers(mux *http.ServeMux) {
 		Qualities []Quality `json:"qualities"`
 		CanPick   bool      `json:"canPick"`
 		Locales   []string  `json:"locales"`
+		Buffers   []int     `json:"buffers"`
 	}
 	writeJSON := func(w http.ResponseWriter, v any, status ...int) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -136,7 +163,7 @@ func (s *Server) settingsHandlers(mux *http.ServeMux) {
 		_ = json.NewEncoder(w).Encode(v)
 	}
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil, Locales: s.locales()})
+		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil, Locales: s.locales(), Buffers: buffers})
 	})
 	mux.HandleFunc("POST /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {
@@ -155,7 +182,7 @@ func (s *Server) settingsHandlers(mux *http.ServeMux) {
 			writeJSON(w, ke.Msg, http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil, Locales: s.locales()})
+		writeJSON(w, view{Settings: s.settings(), Qualities: qualities, CanPick: s.cfg.PickDir != nil, Locales: s.locales(), Buffers: buffers})
 	})
 	// Native folder picker; the UI then saves the result with POST /api/settings.
 	mux.HandleFunc("POST /api/pick-folder", func(w http.ResponseWriter, r *http.Request) {

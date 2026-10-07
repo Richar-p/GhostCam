@@ -70,18 +70,21 @@ type Server struct {
 	sessMu sync.Mutex
 	cur    *session
 
-	mu        sync.Mutex
-	set       Settings
-	publicURL string
-	mapping   *upnp.Mapping
-	err       *Msg // fatal startup error shown in the UI (e.g. tunnel down)
-	progress  *Msg // startup step shown while the tunnel is not ready
-	state     string
-	mode      string
-	file      *record.File
-	count     int    // videos finished since start
-	last      string // last finished video
-	lastBytes int64
+	mu         sync.Mutex
+	set        Settings
+	publicURL  string
+	mapping    *upnp.Mapping
+	err        *Msg // fatal startup error shown in the UI (e.g. tunnel down)
+	progress   *Msg // startup step shown while the tunnel is not ready
+	state      string
+	mode       string
+	file       *record.File
+	count      int    // videos finished since start
+	last       string // last finished video
+	lastBytes  int64
+	buffered   bool    // current video uses the phone-side buffer (MediaRecorder)
+	lag        float64 // seconds still queued on the phone, as it reports them
+	onSettings func()  // set by the active session: pushes new settings to the phone
 }
 
 func New(cfg Config) (*Server, error) {
@@ -173,6 +176,20 @@ func (s *Server) recorded(path string, n int64) {
 func (s *Server) setStatus(state, mode string, f *record.File) {
 	s.mu.Lock()
 	s.state, s.mode, s.file = state, mode, f
+	s.buffered, s.lag = false, 0
+	s.mu.Unlock()
+}
+
+func (s *Server) setBuffered(b bool) {
+	s.mu.Lock()
+	s.buffered = b
+	s.mu.Unlock()
+}
+
+// setLag records the seconds of video still queued in the phone's memory.
+func (s *Server) setLag(seconds float64) {
+	s.mu.Lock()
+	s.lag = seconds
 	s.mu.Unlock()
 }
 
@@ -206,6 +223,8 @@ type helloMsg struct {
 	Nonce      string      `json:"nonce"`
 	ICEServers []ICEServer `json:"iceServers"`
 	Quality    Quality     `json:"quality"`
+	Buffer     int         `json:"buffer"`
+	Qualities  []Quality   `json:"qualities"`
 }
 
 type clientMsg struct {
@@ -228,7 +247,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	if _, err := rand.Read(nonce); err != nil {
 		return
 	}
-	if err := wsjson.Write(ctx, c, helloMsg{Type: "hello", Nonce: base64.RawURLEncoding.EncodeToString(nonce), ICEServers: s.cfg.ICEServers, Quality: s.quality()}); err != nil {
+	if err := wsjson.Write(ctx, c, helloMsg{Type: "hello", Nonce: base64.RawURLEncoding.EncodeToString(nonce), ICEServers: s.cfg.ICEServers, Quality: s.quality(), Buffer: s.settings().Buffer, Qualities: qualities}); err != nil {
 		return
 	}
 
@@ -326,7 +345,8 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 	mux.HandleFunc("GET /api/status", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		st := map[string]any{"url": "", "state": s.state, "mode": s.mode, "file": "", "bytes": 0, "seconds": 0, "upnp": "", "error": s.err, "progress": s.progress, "outDir": s.set.OutDir,
-			"count": s.count, "last": s.last, "lastBytes": s.lastBytes}
+			"count": s.count, "last": s.last, "lastBytes": s.lastBytes,
+			"buffered": s.buffered, "lag": s.lag, "buffer": s.set.Buffer}
 		if q, ok := qualityByID(s.set.Quality); ok {
 			st["quality"], st["targetBitrate"] = q.ID, q.Bitrate
 		}

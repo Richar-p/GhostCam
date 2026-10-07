@@ -39,7 +39,9 @@
       "label": "Enregistrement sur ce PC",
       "starting": "Démarrage…",
       "rate": "Reçu : {{rate}} · cible {{target}} ({{quality}})",
-      "netWarn": "Le réseau du téléphone ne suit pas la qualité choisie : baissez-la dans les paramètres (prochaine vidéo)."
+      "netWarn": "Le réseau du téléphone ne suit pas la qualité choisie : baissez-la dans les paramètres (prochaine vidéo).",
+      "lag": "Retard : {{n}} s",
+      "buffered": "{{mode}} · avec tampon"
     },
     "history": {
       "count_one": "{{count}} vidéo enregistrée",
@@ -69,7 +71,8 @@
       "saved": "Enregistré ✓",
       "appliesNext": "S'applique à la prochaine vidéo, sans reconnecter le téléphone.",
       "licenses": "Licences open source",
-      "source": "Code source"
+      "source": "Code source",
+      "buffer": "Tampon réseau"
     },
     "quality": {
       "meta": "{{height}}p · {{fps}} i/s · ≈ {{rate}} · ≈ {{perHour}} Go/heure",
@@ -93,7 +96,13 @@
       "warnNeed": "Le téléphone doit pouvoir envoyer ≈ {{rate}} en continu.",
       "warnIf": "Si sa connexion ne suit pas :",
       "warnDirect": "Connexion directe : la vidéo reste en temps réel, mais devient saccadée (moins d'images par seconde) et la compression plus visible.",
-      "warnRelay": "Relais chiffré : la vidéo s'accumule sur le téléphone avant d'être envoyée. Ces secondes ne sont pas encore sur le PC et seraient perdues si le téléphone était détruit. Le téléphone affiche alors « Réseau lent »."
+      "warnRelay": "Relais chiffré : la vidéo s'accumule sur le téléphone avant d'être envoyée. Ces secondes ne sont pas encore sur le PC et seraient perdues si le téléphone était détruit. Le téléphone affiche combien de secondes sont en attente."
+    },
+    "buffer": {
+      "off": "Désactivé · temps réel",
+      "seconds": "{{n}} secondes",
+      "helpOff": "Temps réel : rien n'attend sur le téléphone, mais sur un réseau faible la vidéo peut se figer.",
+      "helpOn": "Les coupures réseau ne figent plus la vidéo : elle arrive sur le PC un peu plus tard. Le téléphone garde le retard sous {{n}} s en baissant la qualité ; si le réseau est trop lent même en Économie, le retard continue d'augmenter (affiché sur le téléphone et le PC). Les secondes en attente restent dans la mémoire du téléphone (jamais dans son stockage) et seraient perdues si le téléphone était détruit."
     }
   },
   "phone": {
@@ -120,11 +129,11 @@
       "connecting": "Connexion au PC…",
       "connected": "Connecté au PC · {{mode}}",
       "unstable": "Réseau instable…",
-      "slow": "Réseau lent · {{kb}} Ko en attente",
       "noDirect": "Pas de chemin direct, essai du relais…",
       "retry": "Reconnexion… ({{detail}})",
       "lost": "Connexion perdue, reconnexion…",
-      "refused": "Connexion refusée : ce n'est pas votre PC"
+      "refused": "Connexion refusée : ce n'est pas votre PC",
+      "buffer": "Tampon · {{n}} s en attente"
     },
     "mode": {
       "direct": "direct",
@@ -135,7 +144,11 @@
       "savedSize": "Vidéo enregistrée sur le PC · {{size}}",
       "resumed": "Enregistrement repris (nouveau fichier)",
       "lost": "Connexion perdue : ce qui a été filmé est déjà sur le PC",
-      "error": "Erreur : {{detail}}"
+      "error": "Erreur : {{detail}}",
+      "qualityDown": "Réseau trop lent : qualité baissée à {{quality}} (nouveau fichier)",
+      "memoryFull": "Mémoire du téléphone pleine : enregistrement arrêté",
+      "flushing": "Vidéo arrêtée · les {{n}} dernières secondes partent encore vers le PC",
+      "flushFailed": "Connexion perdue : les dernières secondes ne sont pas arrivées sur le PC"
     },
     "err": {
       "closed": "connexion fermée",

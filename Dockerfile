@@ -18,7 +18,7 @@ CMD ["go", "run", "./cmd/ghostcam", "-headless", "-cloudflared", "/usr/local/bin
 
 # End-to-end test runner: Chromium with a fake camera plays the phone.
 FROM mcr.microsoft.com/playwright:v1.50.0-noble AS e2e
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg iproute2 && rm -rf /var/lib/apt/lists/*
 WORKDIR /e2e
 RUN npm init -y >/dev/null && npm install playwright@1.50.0
 ENV NODE_PATH=/e2e/node_modules

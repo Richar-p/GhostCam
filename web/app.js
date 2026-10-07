@@ -31,7 +31,10 @@ const S = {
   recStart: 0,
   busy: false,
   count: 0,
-  quality: { width: 1280, height: 720, fps: 30, bitrate: 2_000_000 }, // chosen on the PC
+  quality: { id: 'standard', width: 1280, height: 720, fps: 30, bitrate: 2_000_000 }, // chosen on the PC
+  qualities: [],      // all presets, to step down when the buffer overflows
+  localQuality: null, // automatic downgrade, until the PC settings change
+  buffer: 0,          // seconds of video the phone may hold in memory (0 = real time)
 };
 let kAuth, kEnc, wakeLock;
 
@@ -166,29 +169,47 @@ document.addEventListener('visibilitychange', () => {
 
 // ---------------------------------------------------------------- signaling
 
+// Settings changed on the PC: applied from the next video.
+function onConfig(m) {
+  if (m.quality) S.quality = m.quality;
+  if (typeof m.buffer === 'number') S.buffer = m.buffer;
+  S.localQuality = null; // the user chose again: drop our automatic downgrade
+}
+
 function openSignaling() {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
     ws.binaryType = 'arraybuffer';
+    // Replies are matched by type, so a late "stopped" never answers a "start".
     const queue = [], waiters = [];
+    const deliver = () => {
+      for (let i = 0; i < waiters.length; i++) {
+        const w = waiters[i];
+        const j = queue.findIndex((m) => (!w.type || m.type === w.type) && (!w.match || w.match(m)));
+        if (j >= 0) { waiters.splice(i--, 1); w.resolve(queue.splice(j, 1)[0]); }
+      }
+    };
     ws.onmessage = (e) => {
       const m = JSON.parse(e.data);
-      waiters.length ? waiters.shift().resolve(m) : queue.push(m);
+      if (m.type === 'config') { onConfig(m); return; }
+      if (m.type === 'ack') { if (ws.onAck) ws.onAck(m.bytes); return; } // relay: media bytes received by the PC
+      queue.push(m);
+      deliver();
     };
     ws.onclose = (e) => { while (waiters.length) waiters.shift().reject(new Error(`${t('phone.err.closed')} (${e.code})`)); };
     ws.onerror = () => reject(new Error(t('phone.err.unreachable')));
-    ws.next = (timeout = 15000) => {
-      if (queue.length) return Promise.resolve(queue.shift());
-      if (ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error(t('phone.err.closed')));
-      return new Promise((res, rej) => {
-        const w = {
-          resolve: (m) => { clearTimeout(timer); res(m); },
-          reject: (e) => { clearTimeout(timer); rej(e); },
-        };
-        const timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); rej(new Error(t('phone.err.noReply'))); }, timeout);
-        waiters.push(w);
-      });
-    };
+    ws.next = (timeout = 15000, type = null, match = null) => new Promise((res, rej) => {
+      const w = {
+        type,
+        match,
+        resolve: (m) => { clearTimeout(timer); res(m); },
+        reject: (e) => { clearTimeout(timer); rej(e); },
+      };
+      const timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); rej(new Error(t('phone.err.noReply'))); }, timeout);
+      waiters.push(w);
+      deliver();
+      if (waiters.includes(w) && ws.readyState !== WebSocket.OPEN) { waiters.splice(waiters.indexOf(w), 1); w.reject(new Error(t('phone.err.closed'))); }
+    });
     ws.onopen = () => resolve(ws);
   });
 }
@@ -206,6 +227,162 @@ function waitIceGathering(pc, ms) {
 function checkFingerprint(sdp) {
   const fps = [...sdp.matchAll(/^a=fingerprint:sha-256 ([0-9A-Fa-f:]+)/gm)].map((m) => m[1].replace(/:/g, '').toLowerCase());
   if (!fps.length || fps.some((fp) => fp !== PINNED_FP)) throw new Error('FINGERPRINT');
+}
+
+// ------------------------------------------- buffered recording (RAM only)
+//
+// With a buffer (Settings on the PC), the phone records with MediaRecorder at
+// full frame rate and sends the chunks over a reliable, ordered channel: a
+// network drop delays the video instead of freezing it. Chunks wait in this
+// page's memory, never in the phone's storage. The relay always works this
+// way; with buffer = 0 it just doesn't adapt the quality.
+
+const SLICE = 16 * 1024;            // message size safe on every DataChannel
+const IN_FLIGHT_SEC = 1;            // at most ~1 s of video handed to the channel at once:
+                                    // what the channel holds can't be measured or reordered
+const MAX_RAM = 150 * 1024 * 1024;  // hard cap: stop rather than exhaust memory
+const STEP_EVERY = 5000;            // min ms between two automatic downgrades
+
+function pickMime() {
+  const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+  return types.find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+}
+
+// Outbox: FIFO of {bin} media slices and {text} control items. Items stay in
+// JS memory until the channel has room, which also keeps control messages
+// ordered after the media they follow.
+class Outbox {
+  constructor(send, inFlight) {
+    this.send = send;         // (item) => void
+    this.inFlight = inFlight; // () => bytes still held by the channel
+    this.items = [];
+    this.bytes = 0;
+    this.secs = 0; // duration of the queued media (item.sec), whatever its bitrate
+    this.timer = setInterval(() => this.pump(), 50);
+  }
+  push(item) {
+    if (this.closed) return;
+    this.items.push(item);
+    if (item.bin) this.bytes += item.bin.length;
+    this.secs += item.sec || 0;
+    this.pump();
+  }
+  pump() {
+    const cap = Math.max(32 * 1024, (S.quality.bitrate / 8) * IN_FLIGHT_SEC);
+    while (this.items.length && this.inFlight() < cap) {
+      const it = this.items.shift();
+      if (it.bin) this.bytes -= it.bin.length;
+      this.secs -= it.sec || 0;
+      this.send(it);
+    }
+  }
+  pending() { return this.bytes + this.inFlight(); }
+  // Seconds of video not yet on the network (what the channel holds is at most
+  // ~1 s, estimated from the bitrate).
+  pendingSeconds() { return Math.max(0, this.secs) + (this.inFlight() * 8) / S.quality.bitrate; }
+  close() { this.closed = true; clearInterval(this.timer); this.items = []; this.bytes = 0; this.secs = 0; }
+}
+
+function startSegment(mime, onBytes) {
+  const rec = new MediaRecorder(S.stream, { mimeType: mime, videoBitsPerSecond: S.quality.bitrate, audioBitsPerSecond: 128000 });
+  let chain = Promise.resolve();
+  rec.ondataavailable = (e) => {
+    if (!e.data.size) return;
+    chain = chain.then(async () => onBytes(new Uint8Array(await e.data.arrayBuffer())));
+  };
+  rec.start(1000);
+  // Resolves once the last chunk has been handed to onBytes.
+  return () => new Promise((r) => {
+    if (rec.state === 'inactive') { chain.then(r); return; }
+    rec.onstop = () => chain.then(r);
+    rec.stop();
+  });
+}
+
+function lowerQuality() {
+  const list = (S.qualities || []).slice().sort((a, b) => a.bitrate - b.bitrate);
+  const i = list.findIndex((q) => q.id === S.quality.id);
+  return i > 0 ? list[i - 1] : null;
+}
+
+// bufferedRecording drives one connection's buffered mode, for every video
+// recorded on it. io provides:
+//   begin(mime)  queue the "start" of a new file        end(id)  queue its "stop", tagged with id
+//   data(bytes)  queue media bytes (one MediaRecorder chunk = 1 s)
+//   lag(s)       report seconds pending (not queued)    pending() / pendingSeconds()
+//   reply(type, ms, match)  wait for a PC reply
+//
+// Every "stop" carries an id echoed by the PC: on a slow network the stop of an
+// automatic downgrade is answered long after it was queued, and must not be
+// mistaken for the answer to the user's final stop.
+//
+// Stopping never drops queued video: the button is released at once and the
+// remaining seconds keep flowing in the background for as long as the
+// connection lives (the status line shows them).
+function bufferedRecording(io) {
+  const mime = pickMime();
+  let stopSeg = null, recording = false, lastStep = 0, stepping = false, stopId = 0;
+
+  const begin = (q) => {
+    S.quality = q; // the recorder takes its bitrate from S.quality
+    io.begin(mime);
+    stopSeg = startSegment(mime, io.data);
+  };
+
+  const monitor = () => {
+    const sec = io.pendingSeconds();
+    io.lag(sec);
+    if (sec >= 1) setConn(t('phone.conn.buffer', { n: Math.round(sec) }), sec > Math.max(S.buffer, 1) / 2 ? 'warn' : 'ok');
+    else setConn(t('phone.conn.connected', { mode: io.label }), 'ok');
+    if (!recording) return;
+    if (io.pending() > MAX_RAM) { toast(t('phone.toast.memoryFull')); toggle(); return; }
+    // Buffer over the limit: one quality step down, in a new file. The old
+    // file keeps everything already recorded.
+    if (S.buffer > 0 && sec > S.buffer && !stepping && Date.now() - lastStep > STEP_EVERY) {
+      const lower = lowerQuality();
+      if (!lower) return;
+      stepping = true;
+      lastStep = Date.now();
+      S.localQuality = lower;
+      (async () => {
+        await stopSeg();
+        io.end(++stopId);
+        await applyQuality(lower);
+        begin(lower);
+        toast(t('phone.toast.qualityDown', { quality: t(`pc.quality.${lower.id}.label`) }));
+      })().finally(() => { stepping = false; });
+    }
+  };
+  const tick = setInterval(monitor, 1000);
+
+  return {
+    async start() {
+      io.begin(mime);
+      const m = await io.reply('started', 15000);
+      const q = S.localQuality || m.quality || S.quality;
+      await applyQuality(q);
+      S.quality = q;
+      stopSeg = startSegment(mime, io.data);
+      recording = true;
+    },
+    // Resolves at once. If video is still queued, returns {flushing: seconds,
+    // done: promise of the PC's "stopped"}; otherwise waits for "stopped".
+    async stop() {
+      recording = false;
+      while (stepping) await sleep(50);
+      await stopSeg();
+      const id = ++stopId;
+      io.end(id);
+      const done = io.reply('stopped', 3600000, (m) => m.id === String(id));
+      const sec = io.pendingSeconds();
+      return sec >= 1 ? { flushing: sec, done } : done;
+    },
+    close() {
+      clearInterval(tick);
+      recording = false;
+      if (stopSeg) stopSeg(); // connection lost: stop feeding a dead channel
+    },
+  };
 }
 
 // ---------------------------------------------------- transport: WebRTC
@@ -229,9 +406,12 @@ async function connectWebRTC() {
     const hello = await ws.next();
     const nonce = b64urlDecode(hello.nonce);
     if (hello.quality) S.quality = hello.quality;
+    S.buffer = hello.buffer || 0;
+    S.qualities = hello.qualities || [];
     pc.setConfiguration({ iceServers: hello.iceServers || [] });
     const senders = S.stream.getTracks().map((track) => ({ track, sender: pc.addTransceiver(track, { direction: 'sendonly', streams: [S.stream] }).sender }));
     const dc = pc.createDataChannel('control');
+    dc.binaryType = 'arraybuffer';
 
     await pc.setLocalDescription(await pc.createOffer());
     await waitIceGathering(pc, 3000);
@@ -254,13 +434,29 @@ async function connectWebRTC() {
     ws.close(); // signaling no longer needed
     ok = true;
 
-    const pending = {};
-    dc.onmessage = (e) => { const m = JSON.parse(e.data); if (pending[m.type]) pending[m.type](m); };
-    const request = (type, expect) => new Promise((res, rej) => {
-      const timer = setTimeout(() => { delete pending[expect]; rej(new Error(t('phone.err.noReply'))); }, 8000);
-      pending[expect] = (m) => { clearTimeout(timer); delete pending[expect]; res(m); };
-      dc.send(JSON.stringify({ type }));
+    // Text = real-time control (JSON). Buffered mode uses binary frames only
+    // (start/data/stop, as the relay): mixing text and binary messages did not
+    // keep their relative order end to end.
+    const pending = new Set(); // waiters: {type, match, res, rej}
+    dc.onmessage = (e) => {
+      const m = JSON.parse(e.data);
+      if (m.type === 'config') { onConfig(m); return; }
+      for (const w of pending) {
+        // match skips e.g. the "stopped" of an earlier automatic downgrade
+        if (w.type === m.type && (!w.match || w.match(m))) { pending.delete(w); w.res(m); return; }
+      }
+    };
+    dc.addEventListener('close', () => { for (const w of pending) w.rej(new Error(t('phone.err.closed'))); pending.clear(); });
+    const reply = (type, ms, match = null) => new Promise((res, rej) => {
+      const w = {
+        type, match,
+        res: (m) => { clearTimeout(timer); res(m); },
+        rej: (e) => { clearTimeout(timer); rej(e); },
+      };
+      const timer = setTimeout(() => { pending.delete(w); rej(new Error(t('phone.err.noReply'))); }, ms);
+      pending.add(w);
     });
+    const request = (type, expect) => { const r = reply(expect, 8000); dc.send(JSON.stringify({ type })); return r; };
 
     const closed = new Promise((resolve) => {
       let timer;
@@ -274,20 +470,54 @@ async function connectWebRTC() {
       dc.onclose = resolve;
     });
 
+    // One outbox and one controller per connection, created on first use:
+    // a new video always queues behind the end of the previous one.
+    let outbox = null, buffered = null, mode = null;
+    const getBuffered = () => {
+      if (buffered) return buffered;
+      outbox = new Outbox((it) => dc.send(it.ctrl || it.bin), () => dc.bufferedAmount);
+      buffered = bufferedRecording({
+        label: t('phone.mode.direct'),
+        begin: (mime) => outbox.push({ ctrl: concat(new Uint8Array([FRAME_START]), enc.encode(mime)) }),
+        end: (id) => outbox.push({ ctrl: concat(new Uint8Array([FRAME_STOP]), enc.encode(String(id))) }),
+        data: (bytes) => {
+          for (let o = 0; o < bytes.length; o += SLICE) {
+            const part = bytes.subarray(o, o + SLICE);
+            outbox.push({ bin: concat(new Uint8Array([FRAME_DATA]), part), sec: part.length / bytes.length });
+          }
+        },
+        lag: (sec) => { try { dc.send(JSON.stringify({ type: 'lag', seconds: Math.round(sec * 10) / 10 })); } catch {} },
+        pending: () => outbox.pending(),
+        pendingSeconds: () => outbox.pendingSeconds(),
+        reply,
+      });
+      return buffered;
+    };
+
     return {
       kind: 'direct', // phone.mode.<kind>
       closed,
       async start() {
+        if (S.buffer > 0 && pickMime()) {
+          mode = 'buffered';
+          return getBuffered().start();
+        }
+        mode = 'rtp';
         const m = await request('start', 'started');
-        await applyQuality(m.quality, videoSender);
+        await applyQuality(S.localQuality || m.quality, videoSender);
         for (const s of senders) await s.sender.replaceTrack(s.track);
       },
       async stop() {
+        if (mode === 'buffered') return buffered.stop();
         for (const s of senders) await s.sender.replaceTrack(null);
         await sleep(400); // let in-flight packets reach the PC
         return request('stop', 'stopped');
       },
-      close() { pc.close(); },
+      close() {
+        if (buffered) buffered.close();
+        if (outbox) outbox.close();
+        pc.close();
+      },
     };
   } finally {
     if (!ok) pc.close();
@@ -297,39 +527,39 @@ async function connectWebRTC() {
 
 // ------------------------------------------- transport: encrypted relay
 
-function pickMime() {
-  const types = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
-  return types.find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
-}
-
-const FRAME_START = 1, FRAME_DATA = 2, FRAME_STOP = 3;
+const FRAME_START = 1, FRAME_DATA = 2, FRAME_STOP = 3, FRAME_LAG = 4;
 
 async function connectRelay() {
-  const mime = pickMime();
-  if (!mime) throw new Error(t('phone.err.noRecorder'));
+  if (!pickMime()) throw new Error(t('phone.err.noRecorder'));
   const ws = await openSignaling();
   let nonce;
   try {
     const hello = await ws.next();
     nonce = b64urlDecode(hello.nonce);
     if (hello.quality) S.quality = hello.quality;
+    S.buffer = hello.buffer || 0;
+    S.qualities = hello.qualities || [];
     ws.send(JSON.stringify({ type: 'relay', mac: await mac(nonce, 'relay', '') }));
     if ((await ws.next()).type !== 'ready') throw new Error(t('phone.err.refused'));
   } catch (e) { ws.close(); throw e; }
 
   // Every frame, control included, is encrypted: seq(8) || iv(12) || AES-GCM(type || payload).
-  let seq = 0n, chain = Promise.resolve(), rec = null;
-  const sendFrame = (type, payload) => {
+  // Frames are encrypted and sent strictly in order.
+  let seq = 0n, chain = Promise.resolve(), encrypting = 0;
+  // The OS keeps TCP data that WebSocket.bufferedAmount no longer counts: the
+  // real backlog is the media sent minus what the PC acknowledged.
+  let sentMedia = 0, acked = 0;
+  ws.onAck = (n) => { acked = n; };
+  const sendFrame = (type, body) => {
+    encrypting += body.length;
     chain = chain.then(async () => {
-      const body = payload instanceof Blob ? new Uint8Array(await payload.arrayBuffer()) : payload;
       const seqBytes = new Uint8Array(8);
       new DataView(seqBytes.buffer).setBigUint64(0, seq++);
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: concat(nonce, seqBytes) }, kEnc, concat(new Uint8Array([type]), body));
+      encrypting -= body.length;
       if (ws.readyState === WebSocket.OPEN) ws.send(concat(seqBytes, iv, new Uint8Array(ct)));
-      const lag = Math.round(ws.bufferedAmount / 1024);
-      if (lag > 512) setConn(t('phone.conn.slow', { kb: lag }), 'warn');
-      else setConn(t('phone.conn.connected', { mode: t('phone.mode.relay') }), 'ok');
+      if (type === FRAME_DATA) sentMedia += body.length;
     });
     return chain;
   };
@@ -337,26 +567,27 @@ async function connectRelay() {
   const closed = new Promise((r) => ws.addEventListener('close', r));
   closed.then(() => clearInterval(ping));
 
+  // Control frames carry their payload in "ctrl" (not counted as pending media).
+  const outbox = new Outbox((it) => sendFrame(it.frame, it.ctrl || it.bin || new Uint8Array()), () => Math.max(0, sentMedia - acked) + encrypting);
+  const rec = bufferedRecording({
+    label: t('phone.mode.relay'),
+    begin: (mime) => outbox.push({ frame: FRAME_START, ctrl: enc.encode(mime) }),
+    end: (id) => outbox.push({ frame: FRAME_STOP, ctrl: enc.encode(String(id)) }),
+    data: (bytes) => outbox.push({ frame: FRAME_DATA, bin: bytes, sec: 1 }),
+    lag: (sec) => sendFrame(FRAME_LAG, enc.encode(String(Math.round(sec * 10) / 10))),
+    pending: () => outbox.pending(),
+    pendingSeconds: () => outbox.pendingSeconds(),
+    reply: (type, ms, match) => ws.next(ms, type, match),
+  });
+
   return {
     kind: 'relay',
     closed,
-    async start() {
-      sendFrame(FRAME_START, enc.encode(mime));
-      const ack = await ws.next(8000);
-      if (ack.type !== 'started') throw new Error(t('phone.err.refused'));
-      await applyQuality(ack.quality);
-      rec = new MediaRecorder(S.stream, { mimeType: mime, videoBitsPerSecond: S.quality.bitrate });
-      rec.ondataavailable = (e) => { if (e.data.size) sendFrame(FRAME_DATA, e.data); };
-      rec.start(1000);
-    },
-    async stop() {
-      if (rec && rec.state !== 'inactive') await new Promise((r) => { rec.onstop = r; rec.stop(); });
-      rec = null;
-      await sendFrame(FRAME_STOP, new Uint8Array());
-      return ws.next(8000);
-    },
+    start: () => rec.start(),
+    stop: () => rec.stop(),
     close() {
-      if (rec && rec.state !== 'inactive') rec.stop();
+      rec.close();
+      outbox.close();
       ws.close();
     },
   };
@@ -426,7 +657,14 @@ async function toggle() {
       if (tr) {
         const r = await tr.stop();
         S.count++;
-        toast(r && r.bytes ? t('phone.toast.savedSize', { size: fmtSize(r.bytes) }) : t('phone.toast.saved'));
+        const saved = (m) => toast(m && m.bytes ? t('phone.toast.savedSize', { size: fmtSize(m.bytes) }) : t('phone.toast.saved'));
+        if (r && r.done) {
+          // Buffered: the last seconds are still on their way to the PC.
+          toast(t('phone.toast.flushing', { n: Math.round(r.flushing) }));
+          r.done.then(saved, () => toast(t('phone.toast.flushFailed')));
+        } else {
+          saved(r);
+        }
       }
     }
   } catch (e) {

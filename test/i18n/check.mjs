@@ -17,6 +17,7 @@ const DYNAMIC = {
   'pc.quality.${id}.risk': ['eco', 'standard', 'high', 'max'],
   'pc.quality.${q.id}.risk': ['eco', 'standard', 'high', 'max'],
   'phone.mode.${tr.kind}': ['direct', 'relay'],
+  'pc.quality.${lower.id}.label': ['eco', 'standard', 'high', 'max'],
 };
 
 let errors = 0, warnings = 0;
