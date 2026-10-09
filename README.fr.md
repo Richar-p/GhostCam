@@ -155,8 +155,18 @@ copie dans `%LOCALAPPDATA%\GhostCam\bin\` :
 
 ## Ligne de commande
 
-Chaque binaire GhostCam est aussi un outil en ligne de commande (sous Windows,
-utilisez `ghostcam-cli.exe`, car `ghostcam.exe` est une application fenêtrée) :
+La ligne de commande fonctionne sous Windows, macOS et Linux :
+
+| Système | Fichier à utiliser |
+|---|---|
+| Windows | [`ghostcam-cli.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-cli.exe), un téléchargement à part : `ghostcam.exe` est une application fenêtrée et n'affiche rien dans un terminal |
+| macOS | Le binaire habituel (`ghostcam-macos-apple-silicon` ou `ghostcam-macos-intel`) |
+| Linux | Le binaire habituel (`ghostcam-linux-x64` ou `ghostcam-linux-arm64`) |
+
+Sous macOS et Linux, le même binaire fait les deux : sans argument il ouvre
+l'interface, avec une commande il reste dans le terminal.
+
+Commandes :
 
 | Commande | Rôle |
 |---|---|

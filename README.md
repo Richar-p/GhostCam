@@ -150,8 +150,18 @@ official GitHub releases and installs or updates its own copy in
 
 ## Command line
 
-Every GhostCam binary is also a command-line tool (on Windows, use
-`ghostcam-cli.exe`, since `ghostcam.exe` is a window app):
+The command line works on Windows, macOS and Linux:
+
+| System | File to use |
+|---|---|
+| Windows | [`ghostcam-cli.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-cli.exe), a separate download: `ghostcam.exe` is a window app and prints nothing in a terminal |
+| macOS | The usual binary (`ghostcam-macos-apple-silicon` or `ghostcam-macos-intel`) |
+| Linux | The usual binary (`ghostcam-linux-x64` or `ghostcam-linux-arm64`) |
+
+On macOS and Linux, the same binary does both: without arguments it opens the
+interface, with a command it stays in the terminal.
+
+Commands:
 
 | Command | What it does |
 |---|---|
