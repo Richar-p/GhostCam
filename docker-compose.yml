@@ -30,7 +30,7 @@ services:
       - -c
       - >
         sh scripts/gen-notices.sh &&
-        go build -trimpath -ldflags='-s -w -H=windowsgui' -o /out/ghostcam.exe ./cmd/ghostcam &&
+        go build -trimpath -ldflags="-s -w -H=windowsgui -X main.version=$$(cat VERSION)" -o /out/ghostcam.exe ./cmd/ghostcam &&
         rm -rf /out/cloudflared.exe /out/LICENSE.txt /out/licenses &&
         ls -lh /out/ghostcam.exe
 
@@ -53,7 +53,10 @@ services:
       - .:/src
       - gomod:/go/pkg/mod
       - gocache:/root/.cache/go-build
-    command: go build -o dist/ghostcam-linux ./cmd/ghostcam
+    command: sh -c 'go build -ldflags="-X main.version=$${VERSION_OVERRIDE:-$$(cat VERSION)}" -o dist/$${OUT_NAME:-ghostcam-linux} ./cmd/ghostcam'
+    environment:
+      VERSION_OVERRIDE: ${VERSION_OVERRIDE:-}
+      OUT_NAME: ${OUT_NAME:-}
 
   e2e:
     build: { context: ., target: e2e }
@@ -68,6 +71,14 @@ services:
     volumes:
       - .:/src
     command: sh -c "cp /src/test/e2e/run.mjs /e2e/ && node /e2e/run.mjs"
+
+  # Self-update end to end (see test/update/selfupdate.mjs for the two builds it needs)
+  selfupdate:
+    build: { context: ., target: e2e }
+    profiles: ["test"]
+    volumes:
+      - .:/src:ro
+    command: node /src/test/update/selfupdate.mjs
 
   # docker compose run --rm i18n  -> checks web/locales/*.json (keys, plurals, variables, keys used in code)
   i18n:

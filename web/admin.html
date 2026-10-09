@@ -73,6 +73,14 @@
   #msg.err { color: var(--rec); } #msg.ok { color: var(--ok); }
   #net-warn { color: #d97706; font-size: 13px; margin-top: 10px; }
   .foot a { color: inherit; }
+  .banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 13px;
+            background: var(--card); border: 1px solid #2563eb; }
+  .banner #update-text { flex: 1; }
+  .banner a { color: inherit; }
+  .banner button { flex: none; padding: 6px 12px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 13.5px; cursor: pointer; }
+  .check input { accent-color: var(--fg); margin: 0; }
+  .meta-line { color: var(--muted); font-size: 13px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -85,6 +93,12 @@
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="var(--card)"/><circle cx="15" cy="12" r="2" fill="var(--card)"/><circle cx="8" cy="18" r="2" fill="var(--card)"/></svg>
   </button>
 </header>
+
+<div class="banner" id="update" hidden>
+  <span id="update-text"></span>
+  <a href="#" id="update-notes" data-i18n="pc.update.notes"></a>
+  <button id="update-btn" class="primary" data-i18n="pc.update.install">Update</button>
+</div>
 
 <section class="card center" id="v-starting">
   <div class="spinner"></div>
@@ -150,6 +164,14 @@
     <button id="pick" data-i18n="pc.settings.browse">Browse…</button>
   </div>
 
+  <h2 data-i18n="pc.settings.updates">Updates</h2>
+  <label class="check"><input type="checkbox" id="auto-update"><span data-i18n="pc.settings.autoCheck"></span></label>
+  <div class="folder-row" style="align-items:center">
+    <span class="meta-line" id="version-line" style="flex:1"></span>
+    <button id="check-now" data-i18n="pc.settings.checkNow">Check now</button>
+  </div>
+  <div class="meta-line" id="update-check-msg"></div>
+
   <h2 data-i18n="pc.settings.language">Language</h2>
   <div class="folder-row">
     <select id="lang" data-i18n-attr="aria-label:pc.settings.language"></select>
@@ -178,6 +200,7 @@
   const modeName = (m) => t(m === 'webrtc' ? 'common.mode.direct' : 'common.mode.relay');
   const qualityName = (id) => t(`pc.quality.${id}.label`);
   let url = '', qrFor = '';
+  let lastState = '', currentVersion = '';
   let samples = [], lastFile = '';
 
   async function tick() {
@@ -225,6 +248,8 @@
       );
     }
     $('foot').textContent = s.upnp ? t('pc.foot.upnp') : t('pc.foot.dir', { dir: s.outDir });
+    lastState = s.state;
+    renderUpdate(s.update || {});
   }
 
   $('copy').addEventListener('click', async () => {
@@ -233,6 +258,35 @@
     setTimeout(() => { $('copy').textContent = t('pc.copy.button'); }, 2000);
   });
   $('folder').addEventListener('click', () => fetch('/api/open-folder', { method: 'POST', headers: { 'X-GhostCam': '1' } }));
+
+  // ------------------------------------------------------------- updates
+  function renderUpdate(u) {
+    currentVersion = u.current || '';
+    const key = (u.state && u.state.key) || '';
+    const working = /downloading|restarting/.test(key);
+    const shown = /downloading|restarting|failed/.test(key);
+    $('update').hidden = !(u.version || shown);
+    $('update-text').textContent = shown ? I18N.msg(u.state) : t('pc.update.available', { version: u.version });
+    $('update-notes').hidden = !u.version || working;
+    $('update-btn').hidden = !u.version || working;
+    $('update-btn').disabled = lastState === 'recording';
+    $('update-btn').title = lastState === 'recording' ? t('pc.update.recording') : '';
+    // Result of "Check now", shown in Settings.
+    $('update-check-msg').textContent = /upToDate|checkFailed/.test(key) ? I18N.msg(u.state) : '';
+    $('version-line').textContent = t('pc.settings.version', { version: currentVersion });
+  }
+  $('update-btn').addEventListener('click', async () => {
+    // Restarting changes the pairing secret: the phone must scan again.
+    if ((lastState === 'connected' || lastState === 'recording') && !confirm(t('pc.update.confirmPhone'))) return;
+    const r = await post('/api/update');
+    if (r.status === 409) {
+      let m = { key: 'pc.update.failed', vars: { detail: '' } };
+      try { m = await r.json(); } catch {}
+      alert(I18N.msg(m));
+    }
+  });
+  $('update-notes').addEventListener('click', (e) => { e.preventDefault(); post('/api/open/release'); });
+  $('check-now').addEventListener('click', () => { $('update-check-msg').textContent = '…'; post('/api/update/check'); });
 
   // ------------------------------------------------------------ settings
   const RISK = { eco: 0, standard: 1, high: 2, max: 3 };
@@ -285,6 +339,7 @@
     $('lang').value = cfg.language || '';
     $('buffer').replaceChildren(...(cfg.buffers || [0]).map((n) => el('option', { value: String(n), textContent: n ? t('pc.buffer.seconds', { n }) : t('pc.buffer.off') })));
     $('buffer').value = String(cfg.buffer || 0);
+    $('auto-update').checked = !cfg.noUpdateCheck;
     renderBufferHelp();
     renderWarn();
     $('settings').hidden = false;
@@ -302,7 +357,7 @@
   });
   $('save').addEventListener('click', async () => {
     const language = $('lang').value;
-    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language, buffer: Number($('buffer').value) });
+    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language, buffer: Number($('buffer').value), noUpdateCheck: !$('auto-update').checked });
     if (!r.ok) {
       let m = { key: 'error.badRequest' };
       try { m = await r.json(); } catch {}

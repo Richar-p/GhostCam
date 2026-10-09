@@ -81,6 +81,23 @@ confirm you have the right to submit it. There is no CLA.
   regenerates `third_party_licenses.txt` (embedded in the binary): commit it, and
   mention new licenses in the README.
 
+## Releasing
+
+Installed copies update themselves from the latest GitHub release, so a
+release must follow these rules:
+
+1. Bump the version in `VERSION` **and** in `cmd/ghostcam/winres/winres.json`,
+   then run `docker compose run --rm icons`. `build-release` refuses to build if
+   the two disagree.
+2. `docker compose run --rm build-release` builds every binary and
+   `SHA256SUMS.txt` in `dist/`.
+3. Publish a GitHub release tagged `vX.Y.Z` (not a draft, not a pre-release),
+   with the files **named exactly** `ghostcam.exe`,
+   `ghostcam-macos-apple-silicon`, `ghostcam-macos-intel`, `ghostcam-linux-x64`
+   and `ghostcam-linux-arm64`: installed versions look for these names.
+4. Once published, the update is offered to every running copy within 6 hours.
+   Test it before publishing (see the self-update test in the README).
+
 ## Code style
 
 - Go: standard library first. Every new dependency needs a reason, because the

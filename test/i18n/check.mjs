@@ -85,8 +85,8 @@ scan(join(ROOT, 'web'), ['.js', '.html'], [
   /(?:^|[;"])\s*[\w-]+:([a-z][\w.]+)/gm,
   /\bkey: '([\w.]+)'/g,
 ]);
-scan(join(ROOT, 'internal'), ['.go'], [/"((?:progress|error)\.[A-Za-z.]+)"/g]);
-scan(join(ROOT, 'cmd'), ['.go'], [/"((?:progress|error)\.[A-Za-z.]+)"/g]);
+scan(join(ROOT, 'internal'), ['.go'], [/"((?:progress|error|pc\.update)\.[A-Za-z.]+)"/g]);
+scan(join(ROOT, 'cmd'), ['.go'], [/"((?:progress|error|pc\.update)\.[A-Za-z.]+)"/g]);
 
 for (const k of used) {
   if (!k.includes('.') || /^(https?|data)\b/.test(k)) continue;

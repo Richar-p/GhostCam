@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -24,11 +26,19 @@ import (
 
 	"ghostcam/internal/server"
 	"ghostcam/internal/tunnel"
+	"ghostcam/internal/update"
 	"ghostcam/internal/upnp"
 	"ghostcam/web"
 
 	ghostcam "ghostcam"
 )
+
+// version is set at build time from the VERSION file:
+// go build -ldflags "-X main.version=$(cat VERSION)". "dev" never self-updates.
+var version = "dev"
+
+// How often a running GhostCam looks for a new release.
+const updateEvery = 6 * time.Hour
 
 func main() {
 	var (
@@ -44,11 +54,21 @@ func main() {
 		noUPnP    = flag.Bool("no-upnp", false, "do not try to open the UDP port on the router")
 		headless  = flag.Bool("headless", false, "no window: print the QR code in the terminal (servers, Docker)")
 		webDir    = flag.String("web-dir", "", "serve web assets from this directory (dev live edit)")
+		waitPID   = flag.Int(update.WaitPIDFlag, 0, "internal: wait for this process to exit first (set when restarting after an update)")
+		updAPI    = flag.String("update-api", "", "internal, tests: releases API URL")
+		updPrefix = flag.String("update-prefix", "", "internal, tests: allowed download URL prefix")
 	)
 	flag.Parse()
 
+	// After an update, the previous instance is still closing its recordings
+	// and releasing its ports: wait for it before doing anything.
+	if *waitPID > 0 {
+		update.WaitExit(*waitPID, 30*time.Second)
+	}
+
 	dataDir := appDataDir()
 	setupLog(dataDir)
+	log.Printf("GhostCam %s", version)
 
 	var ice []server.ICEServer
 	if s := strings.TrimSpace(*stun); s != "" {
@@ -77,7 +97,7 @@ func main() {
 		PublicAddr: *listen, AdminAddr: *admin, RTCPort: *rtcPort,
 		Settings: settings, SettingsPath: settingsPath,
 		ICEServers: ice, Web: assets, OpenDir: openPath, PickDir: pickDir,
-		Notices: ghostcam.Notices(), SourceURL: ghostcam.Repo,
+		Notices: ghostcam.Notices(), SourceURL: ghostcam.Repo, Version: version,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -85,6 +105,98 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// ------------------------------------------------------------ updates
+	upd := update.ForRepo(ghostcam.Repo)
+	if *updAPI != "" {
+		upd.API, upd.Prefix = *updAPI, *updPrefix
+	}
+	exe, exeErr := update.Executable()
+	var restart atomic.Bool
+	checkUpdate := func(manual bool) {
+		cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		rel, err := upd.Check(cctx, version)
+		if err != nil {
+			log.Printf("update check: %v", err)
+			if manual {
+				srv.SetUpdateState("pc.update.checkFailed", map[string]any{"detail": err.Error()})
+			}
+			return
+		}
+		srv.SetUpdateAvailable(rel)
+		switch {
+		case rel != nil:
+			log.Printf("update available: %s", rel.Version)
+			srv.SetUpdateState("", nil)
+		case manual:
+			srv.SetUpdateState("pc.update.upToDate", nil)
+		}
+	}
+	var updMu sync.Mutex
+	updating := false
+	applyUpdate := func() error {
+		if srv.Recording() {
+			return server.ErrorKey("pc.update.recording")
+		}
+		if exeErr != nil {
+			return exeErr
+		}
+		updMu.Lock()
+		defer updMu.Unlock()
+		rel := srv.UpdateAvailable()
+		if updating || rel == nil {
+			return nil
+		}
+		updating = true
+		go func() {
+			log.Printf("updating to %s", rel.Version)
+			srv.SetUpdateState("pc.update.downloading", map[string]any{"done": 0, "total": rel.Size >> 20})
+			err := upd.Apply(ctx, rel, exe, func(done, total int64) {
+				srv.SetUpdateState("pc.update.downloading", map[string]any{"done": done >> 20, "total": total >> 20})
+			})
+			if err != nil {
+				log.Printf("update failed: %v", err)
+				srv.SetUpdateState("pc.update.failed", map[string]any{"detail": err.Error()})
+				updMu.Lock()
+				updating = false
+				updMu.Unlock()
+				return
+			}
+			log.Printf("update %s installed, restarting", rel.Version)
+			srv.SetUpdateState("pc.update.restarting", nil)
+			restart.Store(true)
+			time.Sleep(1500 * time.Millisecond) // let the window show it
+			stop()
+		}()
+		return nil
+	}
+	srv.SetUpdateHooks(func() { checkUpdate(true) }, applyUpdate)
+	go func() {
+		// The previous binary is kept until this one has run for a minute.
+		if exeErr == nil {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Minute):
+				update.Cleanup(exe)
+			}
+		}
+	}()
+	go func() {
+		next := time.After(10 * time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-next:
+				if !srv.CurrentSettings().NoUpdateCheck {
+					checkUpdate(false)
+				}
+				next = time.After(updateEvery)
+			}
+		}
+	}()
 
 	go func() {
 		if err := srv.ServePublic(ctx); err != nil {
@@ -166,6 +278,12 @@ func main() {
 	stop()
 	srv.Close() // flush and close the current recording
 	<-netDone
+	if restart.Load() {
+		// New binary in place: start it; it waits for this process to exit.
+		if err := update.Restart(exe); err != nil {
+			log.Printf("restart after update: %v", err)
+		}
+	}
 }
 
 // startTunnel uses -cloudflared if given; otherwise a managed copy in the app

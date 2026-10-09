@@ -48,6 +48,7 @@ Chaque vidéo est enregistrée sur l'ordinateur, dans `Vidéos/GhostCam` (`Films
 - **Réseau mobile lent ?** Choisissez **Économie** dans les paramètres (bouton en haut à droite), ou activez le **tampon réseau** pour que les coupures courtes ne figent plus la vidéo.
 - **Gardez la page caméra ouverte** sur le téléphone : sur iPhone, passer à une autre app coupe la caméra.
 - **Premier lancement :** l'app télécharge le connecteur Cloudflare (environ 50 Mo), le PC doit donc être connecté à Internet une fois.
+- **Mises à jour :** quand une nouvelle version sort, une bannière propose de l'installer en un clic. GhostCam se remplace et redémarre, puis le téléphone scanne le nouveau QR code. Les versions antérieures à 1.3.0 ne savent pas se mettre à jour seules : téléchargez la 1.3.0 une fois.
 
 ### Problèmes courants
 
@@ -151,6 +152,24 @@ copie dans `%LOCALAPPDATA%\GhostCam\bin\` :
   le tunnel (résolution par 1.1.1.1, pour ne pas polluer le cache DNS de la box).
 
 `-cloudflared <chemin>` court-circuite tout cela et utilise votre propre binaire.
+
+## Mises à jour
+
+GhostCam consulte la dernière release GitHub au démarrage, puis toutes les
+6 heures. On peut désactiver cette vérification dans les Paramètres, ou la
+lancer à la main avec *Rechercher maintenant*. Quand une version plus récente
+existe, une bannière propose de l'installer :
+
+1. Le binaire de ce système est téléchargé à côté de l'exécutable.
+2. Il n'est accepté que s'il vient de l'adresse de téléchargement des releases
+   de ce dépôt, a la taille annoncée et correspond à l'**empreinte SHA-256
+   publiée par GitHub**.
+3. L'exécutable en cours est remplacé. L'ancien est gardé en `.old` jusqu'à ce
+   que la nouvelle version ait tourné une minute.
+4. GhostCam redémarre. La nouvelle instance attend que l'ancienne ait fermé ses
+   enregistrements et libéré ses ports.
+
+Une mise à jour est refusée pendant un enregistrement.
 
 ## Modèle de sécurité
 
@@ -287,6 +306,11 @@ LOCALE=en-US docker compose run --rm e2e                  # téléphone et fenê
 BUFFER=5 docker compose run --rm e2e                      # tampon réseau activé
 BUFFER=5 RATE=300kbit QUALITY1=high docker compose run --rm e2e  # réseau bridé : retard, baisse de qualité, rien de perdu
 docker compose run --rm i18n                              # fichiers de traduction : clés, pluriels, variables
+docker compose run --rm --no-deps dev go test ./internal/... # tests unitaires (mise à jour, extraction d'archive)
+# mise à jour automatique de bout en bout : un faux GitHub sert la 1.3.1 à une 1.3.0 en cours
+VERSION_OVERRIDE=1.3.0 OUT_NAME=ghostcam-old docker compose run --rm build-linux
+VERSION_OVERRIDE=1.3.1 OUT_NAME=ghostcam-new docker compose run --rm build-linux
+docker compose run --rm selfupdate
 ```
 
 Pour chaque fichier, le test affiche le nombre d'images et la résolution de la
@@ -301,12 +325,15 @@ internal/record/     fichier en ajout seul synchronisé sur disque, multiplexeur
 internal/pairing/    secret d'appairage, authentification HMAC, déchiffrement AES-GCM des trames
 internal/tunnel/     Cloudflare Quick Tunnel
 internal/upnp/       ouverture du port sur la box + renouvellement du bail
+internal/update/     mise à jour automatique : vérification, téléchargement vérifié, remplacement, redémarrage
 web/                 page du téléphone (index.html, app.js), fenêtre PC (admin.html), i18n.js, icône (intégrées au binaire)
 web/locales/         traductions, i18next JSON v4 (en.json = source)
 notices.go           intègre LICENSE + third_party_licenses.txt (affichés dans l'app)
 scripts/             gen-notices.sh : régénère third_party_licenses.txt
 test/e2e/            test de bout en bout Playwright
 test/i18n/           contrôle de cohérence des traductions
+test/update/         test de bout en bout de la mise à jour automatique
+VERSION              version intégrée aux binaires (comparée à la dernière release)
 ```
 
 ## Problèmes connus et feuille de route

@@ -71,7 +71,11 @@
       "appliesNext": "Applies from the next video, without reconnecting the phone.",
       "licenses": "Open source licenses",
       "source": "Source code",
-      "buffer": "Network buffer"
+      "buffer": "Network buffer",
+      "updates": "Updates",
+      "autoCheck": "Check for updates automatically",
+      "version": "Version {{version}}",
+      "checkNow": "Check now"
     },
     "quality": {
       "meta": "{{height}}p · {{fps}} fps · ≈ {{rate}} · ≈ {{perHour}} GB/hour",
@@ -102,6 +106,18 @@
       "seconds": "{{n}} seconds",
       "helpOff": "Real time: nothing waits on the phone, but on a weak network the video can freeze.",
       "helpOn": "Network drops no longer freeze the video: it reaches the PC a little later. The phone keeps the delay under {{n}} s by lowering the quality; if the network is too slow even in Economy, the delay keeps growing (shown on the phone and the PC). Waiting seconds stay in the phone's memory (never in its storage) and would be lost if the phone were destroyed."
+    },
+    "update": {
+      "available": "Version {{version}} is available",
+      "notes": "What's new",
+      "install": "Update",
+      "downloading": "Downloading the update… {{done}} / {{total}} MB",
+      "restarting": "Update installed: GhostCam is restarting…",
+      "failed": "Update failed: {{detail}}",
+      "recording": "Finish the recording before updating",
+      "confirmPhone": "GhostCam will restart and the phone will have to scan the new QR code. Update now?",
+      "upToDate": "GhostCam is up to date",
+      "checkFailed": "Couldn't check for updates: {{detail}}"
     }
   },
   "phone": {

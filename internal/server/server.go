@@ -32,6 +32,7 @@ import (
 
 	"ghostcam/internal/pairing"
 	"ghostcam/internal/record"
+	"ghostcam/internal/update"
 	"ghostcam/internal/upnp"
 )
 
@@ -53,6 +54,9 @@ type Config struct {
 	PickDir      func(start string) (string, error) // native folder picker (nil if none)
 	Notices      string                             // license texts shown at /licenses
 	SourceURL    string                             // public source repository (AGPL: source offer)
+	Version      string                             // this build (e.g. 1.3.0, or "dev")
+	CheckUpdate  func()                             // look for a newer release now
+	ApplyUpdate  func() error                       // install it and restart (KeyError to refuse)
 }
 
 type session struct {
@@ -82,9 +86,11 @@ type Server struct {
 	count      int    // videos finished since start
 	last       string // last finished video
 	lastBytes  int64
-	buffered   bool    // current video uses the phone-side buffer (MediaRecorder)
-	lag        float64 // seconds still queued on the phone, as it reports them
-	onSettings func()  // set by the active session: pushes new settings to the phone
+	buffered   bool            // current video uses the phone-side buffer (MediaRecorder)
+	lag        float64         // seconds still queued on the phone, as it reports them
+	onSettings func()          // set by the active session: pushes new settings to the phone
+	updAvail   *update.Release // newer release found, nil if up to date
+	updState   *Msg            // update step or result shown in the window
 }
 
 func New(cfg Config) (*Server, error) {
@@ -346,7 +352,8 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 		s.mu.Lock()
 		st := map[string]any{"url": "", "state": s.state, "mode": s.mode, "file": "", "bytes": 0, "seconds": 0, "upnp": "", "error": s.err, "progress": s.progress, "outDir": s.set.OutDir,
 			"count": s.count, "last": s.last, "lastBytes": s.lastBytes,
-			"buffered": s.buffered, "lag": s.lag, "buffer": s.set.Buffer}
+			"buffered": s.buffered, "lag": s.lag, "buffer": s.set.Buffer,
+			"update": s.updateStatus()}
 		if q, ok := qualityByID(s.set.Quality); ok {
 			st["quality"], st["targetBitrate"] = q.ID, q.Bitrate
 		}
@@ -383,8 +390,9 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 
 	s.settingsHandlers(mux)
 	s.localeHandlers(mux)
-	// Opens the licenses page or the source repository in the default browser
-	// (the app window has no navigation controls).
+	s.updateHandlers(mux)
+	// Opens the licenses page, the source repository or the available
+	// release's notes in the default browser (the window has no navigation).
 	mux.HandleFunc("POST /api/open/{what}", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) || s.cfg.OpenDir == nil {
 			return
@@ -393,8 +401,11 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 			"licenses": "http://" + r.Host + "/licenses",
 			"source":   s.cfg.SourceURL,
 		}
+		if rel := s.UpdateAvailable(); rel != nil {
+			targets["release"] = rel.Page
+		}
 		u, ok := targets[r.PathValue("what")]
-		if !ok {
+		if !ok || u == "" {
 			http.NotFound(w, r)
 			return
 		}

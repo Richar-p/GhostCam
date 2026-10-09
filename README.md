@@ -48,6 +48,7 @@ Each video is saved on the computer, in `Videos/GhostCam` (`Movies/GhostCam` on 
 - **Slow mobile network?** Choose **Economy** in the settings (top right button), or turn on the **network buffer** so short drops don't freeze the video.
 - **Keep the camera page open** on the phone: on iPhone, switching to another app stops the camera.
 - **First launch:** the app downloads the Cloudflare connector (~50 MB), so the PC needs an Internet connection once.
+- **Updates:** when a new version is out, a banner offers to install it in one click. GhostCam replaces itself and restarts, and the phone then scans the new QR code. Versions before 1.3.0 can't update themselves: download 1.3.0 once.
 
 ### Troubleshooting
 
@@ -146,6 +147,22 @@ official GitHub releases and installs or updates its own copy in
   tunnel (resolved with 1.1.1.1, so the router's DNS cache isn't polluted).
 
 `-cloudflared <path>` skips all of this and uses your own binary.
+
+## Updates
+
+GhostCam checks the latest GitHub release at startup and then every 6 hours.
+You can turn this off in Settings, or check manually with *Check now*. When a
+newer version exists, a banner offers to install it:
+
+1. The binary for this platform is downloaded next to the executable.
+2. It is accepted only if it comes from this repository's release download URL,
+   has the announced size and matches the **SHA-256 digest published by GitHub**.
+3. The running executable is replaced. The previous one is kept as `.old` until
+   the new version has run for a minute.
+4. GhostCam restarts. The new instance waits for the old one to close its
+   recordings and release its ports.
+
+An update is refused while a video is recording.
 
 ## Security model
 
@@ -273,6 +290,11 @@ LOCALE=en-US docker compose run --rm e2e                  # phone and PC window 
 BUFFER=5 docker compose run --rm e2e                      # network buffer on
 BUFFER=5 RATE=300kbit QUALITY1=high docker compose run --rm e2e  # throttled network: delay, quality steps down, nothing lost
 docker compose run --rm i18n                              # translation files: keys, plurals, variables
+docker compose run --rm --no-deps dev go test ./internal/... # unit tests (updater, archive extraction)
+# self-update end to end: a fake GitHub serves 1.3.1 to a running 1.3.0
+VERSION_OVERRIDE=1.3.0 OUT_NAME=ghostcam-old docker compose run --rm build-linux
+VERSION_OVERRIDE=1.3.1 OUT_NAME=ghostcam-new docker compose run --rm build-linux
+docker compose run --rm selfupdate
 ```
 
 The test prints, for each file, the frame count and the resolution of the first
@@ -287,12 +309,15 @@ internal/record/     fsync'ed append-only file, live WebM muxer
 internal/pairing/    pairing secret, HMAC auth, AES-GCM frame decryption
 internal/tunnel/     cloudflared Quick Tunnel
 internal/upnp/       router port mapping + lease renewal
+internal/update/     self-update: release check, verified download, binary swap, restart
 web/                 phone page (index.html, app.js), PC window (admin.html), i18n.js, icon (embedded in the binary)
 web/locales/         translations, i18next JSON v4 (en.json = source)
 notices.go           embeds LICENSE + third_party_licenses.txt (shown in the app)
 scripts/             gen-notices.sh: regenerates third_party_licenses.txt
 test/e2e/            Playwright end-to-end test
 test/i18n/           translation consistency check
+test/update/         self-update end-to-end test
+VERSION              version embedded in the binaries (compared with the latest release)
 ```
 
 ## Known issues and roadmap

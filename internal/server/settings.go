@@ -50,6 +50,9 @@ type Settings struct {
 	// drops delay the video instead of freezing it. The buffer lives in the
 	// phone's RAM only, never in its storage.
 	Buffer int `json:"buffer"`
+	// NoUpdateCheck turns off the automatic check for new releases (on by
+	// default: the zero value keeps existing settings files checking).
+	NoUpdateCheck bool `json:"noUpdateCheck"`
 }
 
 // buffers are the allowed Settings.Buffer values, in seconds.

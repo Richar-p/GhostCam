@@ -72,7 +72,11 @@
       "appliesNext": "S'applique à la prochaine vidéo, sans reconnecter le téléphone.",
       "licenses": "Licences open source",
       "source": "Code source",
-      "buffer": "Tampon réseau"
+      "buffer": "Tampon réseau",
+      "updates": "Mises à jour",
+      "autoCheck": "Rechercher les mises à jour automatiquement",
+      "version": "Version {{version}}",
+      "checkNow": "Rechercher maintenant"
     },
     "quality": {
       "meta": "{{height}}p · {{fps}} i/s · ≈ {{rate}} · ≈ {{perHour}} Go/heure",
@@ -103,6 +107,18 @@
       "seconds": "{{n}} secondes",
       "helpOff": "Temps réel : rien n'attend sur le téléphone, mais sur un réseau faible la vidéo peut se figer.",
       "helpOn": "Les coupures réseau ne figent plus la vidéo : elle arrive sur le PC un peu plus tard. Le téléphone garde le retard sous {{n}} s en baissant la qualité ; si le réseau est trop lent même en Économie, le retard continue d'augmenter (affiché sur le téléphone et le PC). Les secondes en attente restent dans la mémoire du téléphone (jamais dans son stockage) et seraient perdues si le téléphone était détruit."
+    },
+    "update": {
+      "available": "La version {{version}} est disponible",
+      "notes": "Nouveautés",
+      "install": "Mettre à jour",
+      "downloading": "Téléchargement de la mise à jour… {{done}} / {{total}} Mo",
+      "restarting": "Mise à jour installée : GhostCam redémarre…",
+      "failed": "La mise à jour a échoué : {{detail}}",
+      "recording": "Terminez l'enregistrement avant de mettre à jour",
+      "confirmPhone": "GhostCam va redémarrer et le téléphone devra scanner le nouveau QR code. Mettre à jour maintenant ?",
+      "upToDate": "GhostCam est à jour",
+      "checkFailed": "Impossible de vérifier les mises à jour : {{detail}}"
     }
   },
   "phone": {
