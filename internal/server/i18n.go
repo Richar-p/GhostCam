@@ -29,8 +29,11 @@ func keyErr(key string, vars map[string]any) error {
 }
 
 // locales lists the available translation codes (web/locales/<code>.json).
-func (s *Server) locales() []string {
-	files, _ := fs.Glob(s.cfg.Web, "locales/*.json")
+func (s *Server) locales() []string { return LocalesIn(s.cfg.Web) }
+
+// LocalesIn lists the translation codes found in a web assets tree.
+func LocalesIn(web fs.FS) []string {
+	files, _ := fs.Glob(web, "locales/*.json")
 	out := make([]string, 0, len(files))
 	for _, f := range files {
 		out = append(out, strings.TrimSuffix(path.Base(f), ".json"))

@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 // Quality is sent to the phone, which applies it at the start of each video
@@ -53,6 +55,24 @@ type Settings struct {
 	// NoUpdateCheck turns off the automatic check for new releases (on by
 	// default: the zero value keeps existing settings files checking).
 	NoUpdateCheck bool `json:"noUpdateCheck"`
+	// Tunnel makes the phone page reachable from the Internet: "cloudflare"
+	// (default), "localhostrun", or "custom" with TunnelURL, the user's own
+	// HTTPS address forwarding to the local server.
+	Tunnel    string `json:"tunnel"`
+	TunnelURL string `json:"tunnelUrl"`
+}
+
+// tunnels are the allowed Settings.Tunnel values (see internal/tunnel).
+var tunnels = []string{"cloudflare", "localhostrun", "custom"}
+
+// validTunnelURL accepts a full https:// URL with a host (the phone's browser
+// needs HTTPS for the camera).
+func validTunnelURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+		return keyErr("error.tunnelURL", nil)
+	}
+	return nil
 }
 
 // buffers are the allowed Settings.Buffer values, in seconds.
@@ -75,6 +95,9 @@ func LoadSettings(path string, def Settings) Settings {
 	}
 	if !slices.Contains(buffers, s.Buffer) {
 		s.Buffer = 0
+	}
+	if !slices.Contains(tunnels, s.Tunnel) || (s.Tunnel == "custom" && validTunnelURL(s.TunnelURL) != nil) {
+		s.Tunnel = "cloudflare"
 	}
 	return s
 }
@@ -102,21 +125,9 @@ func (s *Server) quality() Quality {
 
 // updateSettings validates, applies (from the next video on) and persists.
 func (s *Server) updateSettings(n Settings) error {
-	if _, ok := qualityByID(n.Quality); !ok {
-		return keyErr("error.unknownQuality", nil)
-	}
-	if n.Language != "" && !slices.Contains(s.locales(), n.Language) {
-		return keyErr("error.unknownLanguage", nil)
-	}
-	if !slices.Contains(buffers, n.Buffer) {
-		return keyErr("error.badRequest", nil)
-	}
-	n.OutDir = filepath.Clean(n.OutDir)
-	if !filepath.IsAbs(n.OutDir) {
-		return keyErr("error.dirNotAbsolute", nil)
-	}
-	if err := checkWritable(n.OutDir); err != nil {
-		return keyErr("error.dirUnusable", map[string]any{"detail": err.Error()})
+	n, err := NormalizeSettings(n, s.locales())
+	if err != nil {
+		return err
 	}
 	s.mu.Lock()
 	s.set = n
@@ -128,13 +139,61 @@ func (s *Server) updateSettings(n Settings) error {
 	if s.cfg.SettingsPath == "" {
 		return nil
 	}
+	return SaveSettings(s.cfg.SettingsPath, n)
+}
+
+// NormalizeSettings validates n (errors are KeyError, translatable) and
+// returns it cleaned up. Shared by the window and the command line.
+func NormalizeSettings(n Settings, locales []string) (Settings, error) {
+	if _, ok := qualityByID(n.Quality); !ok {
+		return n, keyErr("error.unknownQuality", nil)
+	}
+	if n.Language != "" && !slices.Contains(locales, n.Language) {
+		return n, keyErr("error.unknownLanguage", nil)
+	}
+	if !slices.Contains(buffers, n.Buffer) {
+		return n, keyErr("error.badRequest", nil)
+	}
+	if n.Tunnel == "" {
+		n.Tunnel = "cloudflare"
+	}
+	if !slices.Contains(tunnels, n.Tunnel) {
+		return n, keyErr("error.badRequest", nil)
+	}
+	n.TunnelURL = strings.TrimRight(strings.TrimSpace(n.TunnelURL), "/")
+	if n.Tunnel == "custom" {
+		if err := validTunnelURL(n.TunnelURL); err != nil {
+			return n, err
+		}
+	}
+	n.OutDir = filepath.Clean(n.OutDir)
+	if !filepath.IsAbs(n.OutDir) {
+		return n, keyErr("error.dirNotAbsolute", nil)
+	}
+	if err := checkWritable(n.OutDir); err != nil {
+		return n, keyErr("error.dirUnusable", map[string]any{"detail": err.Error()})
+	}
+	return n, nil
+}
+
+// SaveSettings writes the settings file atomically.
+func SaveSettings(path string, n Settings) error {
 	b, _ := json.MarshalIndent(n, "", "  ")
-	tmp := s.cfg.SettingsPath + ".tmp"
+	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, s.cfg.SettingsPath)
+	return os.Rename(tmp, path)
 }
+
+// Qualities lists the quality presets (for the command line).
+func Qualities() []Quality { return qualities }
+
+// Buffers lists the allowed buffer values, in seconds.
+func Buffers() []int { return buffers }
+
+// Tunnels lists the tunnel providers.
+func Tunnels() []string { return tunnels }
 
 func checkWritable(dir string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {

@@ -76,7 +76,8 @@
       "updates": "Mises à jour",
       "autoCheck": "Rechercher les mises à jour automatiquement",
       "version": "Version {{version}}",
-      "checkNow": "Rechercher maintenant"
+      "checkNow": "Rechercher maintenant",
+      "tunnel": "Lien Internet"
     },
     "quality": {
       "meta": "{{height}}p · {{fps}} i/s · ≈ {{rate}} · ≈ {{perHour}} Go/heure",
@@ -119,6 +120,15 @@
       "confirmPhone": "GhostCam va redémarrer et le téléphone devra scanner le nouveau QR code. Mettre à jour maintenant ?",
       "upToDate": "GhostCam est à jour",
       "checkFailed": "Impossible de vérifier les mises à jour : {{detail}}"
+    },
+    "tunnel": {
+      "cloudflare": "Cloudflare (recommandé)",
+      "localhostrun": "localhost.run",
+      "custom": "Mon adresse perso",
+      "helpCloudflare": "Cloudflare Quick Tunnel : sans compte. Le connecteur est téléchargé et mis à jour automatiquement.",
+      "helpLocalhostrun": "Tunnel SSH intégré à GhostCam : rien à télécharger, sans compte. L'adresse gratuite change plus souvent, le téléphone devra donc parfois rescanner.",
+      "helpCustom": "N'importe quelle adresse HTTPS que vous contrôlez et qui redirige vers cet ordinateur sur {{target}} : ngrok, Tailscale Funnel, un tunnel Cloudflare nommé, votre propre reverse proxy…",
+      "restart": "Changer de lien donne un nouveau QR code : le téléphone devra le scanner."
     }
   },
   "phone": {
@@ -163,8 +173,10 @@
       "error": "Erreur : {{detail}}",
       "qualityDown": "Réseau trop lent : qualité baissée à {{quality}} (nouveau fichier)",
       "memoryFull": "Mémoire du téléphone pleine : enregistrement arrêté",
-      "flushing": "Vidéo arrêtée · les {{n}} dernières secondes partent encore vers le PC",
-      "flushFailed": "Connexion perdue : les dernières secondes ne sont pas arrivées sur le PC"
+      "flushFailed": "Connexion perdue : les dernières secondes ne sont pas arrivées sur le PC",
+      "flushing_one": "Vidéo arrêtée · la dernière seconde part encore vers le PC",
+      "flushing_many": "Vidéo arrêtée · les {{count}} dernières secondes partent encore vers le PC",
+      "flushing_other": "Vidéo arrêtée · les {{count}} dernières secondes partent encore vers le PC"
     },
     "err": {
       "closed": "connexion fermée",
@@ -180,7 +192,8 @@
     "cfDownload": "Téléchargement de cloudflared {{version}}… {{done}} / {{total}} Mo",
     "cfSignature": "Vérification de la signature de cloudflared…",
     "tunnel": "Ouverture du lien sécurisé…",
-    "publicCheck": "Vérification du lien public…"
+    "publicCheck": "Vérification du lien public…",
+    "tunnelLost": "Lien sécurisé perdu, reconnexion…"
   },
   "error": {
     "publicListener": "Le serveur public ({{addr}}) a échoué : {{detail}}",
@@ -191,6 +204,7 @@
     "dirNotAbsolute": "Le dossier doit être un chemin complet (ex. D:\\Vidéos\\GhostCam)",
     "dirUnusable": "Dossier inutilisable : {{detail}}",
     "badRequest": "Requête invalide",
-    "saveFailed": "Impossible d'enregistrer les paramètres : {{detail}}"
+    "saveFailed": "Impossible d'enregistrer les paramètres : {{detail}}",
+    "tunnelURL": "L'adresse perso doit être une URL complète en https:// (ex. https://ghostcam.example.org)"
   }
 }

@@ -21,17 +21,19 @@ const QUALITY2 = process.env.QUALITY2 || 'eco'; // quality set after video 1
 const QUALITY1 = process.env.QUALITY1 || 'standard';
 const BUFFER = Number(process.env.BUFFER || 0);
 const RATE = process.env.RATE || ''; // e.g. 1mbit: netem rate limit on loopback
+const TUNNEL = process.env.TUNNEL || ''; // e.g. localhostrun: real tunnel, the phone goes through the Internet
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const status = async () => (await fetch('http://localhost:8081/api/status')).json();
 
 rmSync(OUT, { recursive: true, force: true });
 rmSync(OUT2, { recursive: true, force: true });
 rmSync('/root/.config/GhostCam', { recursive: true, force: true });
-const srv = spawn('/src/dist/ghostcam-linux', ['-headless', '-no-upnp', '-stun', '', '-public-url', 'http://localhost:8080',
+const srv = spawn('/src/dist/ghostcam-linux', ['-headless', '-no-upnp', '-stun', '', ...(TUNNEL ? ['-tunnel', TUNNEL] : ['-public-url', 'http://localhost:8080']),
   '-out', OUT, '-admin', '127.0.0.1:8081'], { stdio: ['ignore', 'ignore', 'inherit'] });
 
 let url;
-for (let i = 0; i < 50 && !url; i++) { try { url = (await status()).url; } catch {} await sleep(200); }
+for (let i = 0; i < (TUNNEL ? 400 : 50) && !url; i++) { try { url = (await status()).url; } catch {} await sleep(200); }
+if (TUNNEL) console.log('public URL via', TUNNEL + ':', url.replace(/#.*/, ''));
 if (!url) throw new Error('server did not start');
 const setSettings = (quality, outDir) => fetch('http://localhost:8081/api/settings', { method: 'POST', headers: { 'X-GhostCam': '1' },
   body: JSON.stringify({ quality, outDir, buffer: BUFFER }) });

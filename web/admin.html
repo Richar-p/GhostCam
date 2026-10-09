@@ -158,6 +158,15 @@
   </div>
   <div class="note" id="buffer-help"></div>
 
+  <h2 data-i18n="pc.settings.tunnel">Internet link</h2>
+  <div class="folder-row">
+    <select id="tunnel" data-i18n-attr="aria-label:pc.settings.tunnel"></select>
+  </div>
+  <div class="folder-row" id="tunnel-url-row" hidden>
+    <input id="tunnel-url" spellcheck="false" placeholder="https://ghostcam.example.org" data-i18n-attr="aria-label:pc.tunnel.custom">
+  </div>
+  <div class="note" id="tunnel-help"></div>
+
   <h2 data-i18n="pc.settings.folder">Videos folder</h2>
   <div class="folder-row">
     <input id="dir" spellcheck="false" data-i18n-attr="aria-label:pc.settings.folder">
@@ -309,6 +318,15 @@
     );
   }
 
+  const TUNNELS = ['cloudflare', 'localhostrun', 'custom'];
+  const tunnelHelpKey = { cloudflare: 'pc.tunnel.helpCloudflare', localhostrun: 'pc.tunnel.helpLocalhostrun', custom: 'pc.tunnel.helpCustom' };
+  function renderTunnel() {
+    const v = $('tunnel').value;
+    $('tunnel-url-row').hidden = v !== 'custom';
+    const changed = cfg && (v !== (cfg.tunnel || 'cloudflare') || (v === 'custom' && $('tunnel-url').value.trim() !== (cfg.tunnelUrl || '')));
+    $('tunnel-help').textContent = t(tunnelHelpKey[v], { target: '127.0.0.1:8080' }) + (changed ? ' ' + t('pc.tunnel.restart') : '');
+  }
+
   function renderBufferHelp() {
     const n = Number($('buffer').value);
     $('buffer-help').textContent = n ? t('pc.buffer.helpOn', { n }) : t('pc.buffer.helpOff');
@@ -340,6 +358,10 @@
     $('buffer').replaceChildren(...(cfg.buffers || [0]).map((n) => el('option', { value: String(n), textContent: n ? t('pc.buffer.seconds', { n }) : t('pc.buffer.off') })));
     $('buffer').value = String(cfg.buffer || 0);
     $('auto-update').checked = !cfg.noUpdateCheck;
+    $('tunnel').replaceChildren(...TUNNELS.map((v) => el('option', { value: v, textContent: t(`pc.tunnel.${v}`) })));
+    $('tunnel').value = cfg.tunnel || 'cloudflare';
+    $('tunnel-url').value = cfg.tunnelUrl || '';
+    renderTunnel();
     renderBufferHelp();
     renderWarn();
     $('settings').hidden = false;
@@ -347,6 +369,8 @@
 
   $('open-settings').addEventListener('click', openSettings);
   $('buffer').addEventListener('change', renderBufferHelp);
+  $('tunnel').addEventListener('change', renderTunnel);
+  $('tunnel-url').addEventListener('input', renderTunnel);
   $('close-settings').addEventListener('click', () => { $('settings').hidden = true; });
   $('pick').addEventListener('click', async () => {
     $('pick').disabled = true;
@@ -357,7 +381,7 @@
   });
   $('save').addEventListener('click', async () => {
     const language = $('lang').value;
-    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language, buffer: Number($('buffer').value), noUpdateCheck: !$('auto-update').checked });
+    const r = await post('/api/settings', { quality: selected(), outDir: $('dir').value.trim(), language, buffer: Number($('buffer').value), noUpdateCheck: !$('auto-update').checked, tunnel: $('tunnel').value, tunnelUrl: $('tunnel-url').value.trim() });
     if (!r.ok) {
       let m = { key: 'error.badRequest' };
       try { m = await r.json(); } catch {}

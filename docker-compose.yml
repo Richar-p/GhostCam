@@ -67,6 +67,7 @@ services:
       BUFFER: ${BUFFER:-0}
       RATE: ${RATE:-}
       QUALITY1: ${QUALITY1:-standard}
+      TUNNEL: ${TUNNEL:-}
     cap_add: [NET_ADMIN] # RATE: netem rate limit on the container's loopback
     volumes:
       - .:/src

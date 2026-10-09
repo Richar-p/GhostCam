@@ -42,7 +42,7 @@ func TestNewer(t *testing.T) {
 // fakeGitHub serves a "latest release" with this platform's asset.
 func fakeGitHub(t *testing.T, tag string, body []byte, digest string) (*httptest.Server, *Updater) {
 	t.Helper()
-	asset := AssetName(runtime.GOOS, runtime.GOARCH)
+	asset := AssetName(runtime.GOOS, runtime.GOARCH, false)
 	mux := http.NewServeMux()
 	srv := httptest.NewServer(mux)
 	prefix := srv.URL + "/owner/repo/releases/download/"
@@ -137,5 +137,20 @@ func TestWaitExit(t *testing.T) {
 	}
 	if WaitExit(os.Getpid(), 300*time.Millisecond) {
 		t.Fatal("the test process itself is alive")
+	}
+}
+
+func TestAssetName(t *testing.T) {
+	cases := map[[3]string]string{
+		{"windows", "amd64", ""}:    "ghostcam.exe",
+		{"windows", "amd64", "cli"}: "ghostcam-cli.exe",
+		{"linux", "amd64", "cli"}:   "ghostcam-linux-x64", // one binary does both
+		{"darwin", "arm64", ""}:     "ghostcam-macos-apple-silicon",
+		{"freebsd", "amd64", ""}:    "",
+	}
+	for in, want := range cases {
+		if got := AssetName(in[0], in[1], in[2] == "cli"); got != want {
+			t.Errorf("AssetName%v = %q, want %q", in, got, want)
+		}
 	}
 }

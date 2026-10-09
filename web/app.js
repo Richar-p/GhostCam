@@ -660,7 +660,7 @@ async function toggle() {
         const saved = (m) => toast(m && m.bytes ? t('phone.toast.savedSize', { size: fmtSize(m.bytes) }) : t('phone.toast.saved'));
         if (r && r.done) {
           // Buffered: the last seconds are still on their way to the PC.
-          toast(t('phone.toast.flushing', { n: Math.round(r.flushing) }));
+          toast(t('phone.toast.flushing', { count: Math.max(1, Math.round(r.flushing)) }));
           r.done.then(saved, () => toast(t('phone.toast.flushFailed')));
         } else {
           saved(r);

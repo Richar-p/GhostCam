@@ -75,7 +75,8 @@
       "updates": "Updates",
       "autoCheck": "Check for updates automatically",
       "version": "Version {{version}}",
-      "checkNow": "Check now"
+      "checkNow": "Check now",
+      "tunnel": "Internet link"
     },
     "quality": {
       "meta": "{{height}}p · {{fps}} fps · ≈ {{rate}} · ≈ {{perHour}} GB/hour",
@@ -118,6 +119,15 @@
       "confirmPhone": "GhostCam will restart and the phone will have to scan the new QR code. Update now?",
       "upToDate": "GhostCam is up to date",
       "checkFailed": "Couldn't check for updates: {{detail}}"
+    },
+    "tunnel": {
+      "cloudflare": "Cloudflare (recommended)",
+      "localhostrun": "localhost.run",
+      "custom": "My own address",
+      "helpCloudflare": "Cloudflare Quick Tunnel: no account needed. The connector is downloaded and kept up to date automatically.",
+      "helpLocalhostrun": "SSH tunnel built into GhostCam: nothing to download, no account. The free address changes more often, so the phone may have to scan again.",
+      "helpCustom": "Any HTTPS address you control that forwards to this computer at {{target}}: ngrok, Tailscale Funnel, a Cloudflare named tunnel, your own reverse proxy…",
+      "restart": "Changing the link gives a new QR code: the phone will have to scan it."
     }
   },
   "phone": {
@@ -161,8 +171,9 @@
       "error": "Error: {{detail}}",
       "qualityDown": "Network too slow: quality lowered to {{quality}} (new file)",
       "memoryFull": "Phone memory full: recording stopped",
-      "flushing": "Video stopped · the last {{n}} s are still being sent to the PC",
-      "flushFailed": "Connection lost: the last seconds did not reach the PC"
+      "flushFailed": "Connection lost: the last seconds did not reach the PC",
+      "flushing_one": "Video stopped · the last second is still being sent to the PC",
+      "flushing_other": "Video stopped · the last {{count}} seconds are still being sent to the PC"
     },
     "err": {
       "closed": "connection closed",
@@ -178,7 +189,8 @@
     "cfDownload": "Downloading cloudflared {{version}}… {{done}} / {{total}} MB",
     "cfSignature": "Checking the cloudflared signature…",
     "tunnel": "Opening the secure link…",
-    "publicCheck": "Checking the public link…"
+    "publicCheck": "Checking the public link…",
+    "tunnelLost": "Secure link lost, reconnecting…"
   },
   "error": {
     "publicListener": "The public server ({{addr}}) failed: {{detail}}",
@@ -189,6 +201,7 @@
     "dirNotAbsolute": "The folder must be a full path (e.g. D:\\Videos\\GhostCam)",
     "dirUnusable": "Folder unusable: {{detail}}",
     "badRequest": "Invalid request",
-    "saveFailed": "Couldn't save the settings: {{detail}}"
+    "saveFailed": "Couldn't save the settings: {{detail}}",
+    "tunnelURL": "The custom address must be a full https:// URL (e.g. https://ghostcam.example.org)"
   }
 }

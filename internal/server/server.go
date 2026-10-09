@@ -140,6 +140,14 @@ func (s *Server) SetProgress(key string, vars map[string]any) {
 }
 
 // SetError shows a fatal error; err's text is passed as the {{detail}} variable.
+// ClearError removes the startup error once the cause is gone (e.g. the
+// tunnel reconnected).
+func (s *Server) ClearError() {
+	s.mu.Lock()
+	s.err = nil
+	s.mu.Unlock()
+}
+
 func (s *Server) SetError(key string, err error, vars map[string]any) {
 	log.Printf("error: %s: %v", key, err)
 	if vars == nil {
@@ -349,26 +357,9 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 		_, _ = w.Write(png)
 	})
 	mux.HandleFunc("GET /api/status", func(w http.ResponseWriter, r *http.Request) {
-		s.mu.Lock()
-		st := map[string]any{"url": "", "state": s.state, "mode": s.mode, "file": "", "bytes": 0, "seconds": 0, "upnp": "", "error": s.err, "progress": s.progress, "outDir": s.set.OutDir,
-			"count": s.count, "last": s.last, "lastBytes": s.lastBytes,
-			"buffered": s.buffered, "lag": s.lag, "buffer": s.set.Buffer,
-			"update": s.updateStatus()}
-		if q, ok := qualityByID(s.set.Quality); ok {
-			st["quality"], st["targetBitrate"] = q.ID, q.Bitrate
-		}
-		if s.file != nil {
-			st["file"], st["bytes"] = filepath.Base(s.file.Path()), s.file.Written()
-			st["seconds"] = int(time.Since(s.file.Started()).Seconds())
-		}
-		if s.mapping != nil {
-			st["upnp"] = fmt.Sprintf("%s:%d/udp", s.mapping.ExternalIP, s.mapping.Port)
-		}
-		s.mu.Unlock()
-		st["url"] = s.PairingURL()
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(st)
+		_ = json.NewEncoder(w).Encode(s.Status())
 	})
 
 	// The custom header forces a CORS preflight, so other sites cannot POST here.
@@ -429,6 +420,29 @@ func (s *Server) ServeAdmin(ctx context.Context) error {
 		mux.ServeHTTP(w, r)
 	})
 	return serve(ctx, s.cfg.AdminAddr, h)
+}
+
+// Status is what the PC window (and the command line) shows: connection,
+// recording, update, errors.
+func (s *Server) Status() map[string]any {
+	s.mu.Lock()
+	st := map[string]any{"url": "", "state": s.state, "mode": s.mode, "file": "", "bytes": 0, "seconds": 0, "upnp": "", "error": s.err, "progress": s.progress, "outDir": s.set.OutDir,
+		"count": s.count, "last": s.last, "lastBytes": s.lastBytes,
+		"buffered": s.buffered, "lag": s.lag, "buffer": s.set.Buffer,
+		"update": s.updateStatus()}
+	if q, ok := qualityByID(s.set.Quality); ok {
+		st["quality"], st["targetBitrate"] = q.ID, q.Bitrate
+	}
+	if s.file != nil {
+		st["file"], st["bytes"] = filepath.Base(s.file.Path()), s.file.Written()
+		st["seconds"] = int(time.Since(s.file.Started()).Seconds())
+	}
+	if s.mapping != nil {
+		st["upnp"] = fmt.Sprintf("%s:%d/udp", s.mapping.ExternalIP, s.mapping.Port)
+	}
+	s.mu.Unlock()
+	st["url"] = s.PairingURL()
+	return st
 }
 
 // ---------------------------------------------------------------------- utils

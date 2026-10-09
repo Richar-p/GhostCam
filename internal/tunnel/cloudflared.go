@@ -22,10 +22,15 @@ import (
 
 var urlRe = regexp.MustCompile(`https://[a-z0-9-]+\.trycloudflare\.com`)
 
-type Tunnel struct {
-	URL string
-	cmd *exec.Cmd
+// CloudflaredTunnel is a Cloudflare Quick Tunnel run by a cloudflared child process.
+type CloudflaredTunnel struct {
+	url  string
+	cmd  *exec.Cmd
+	done chan struct{}
 }
+
+func (t *CloudflaredTunnel) URL() string           { return t.url }
+func (t *CloudflaredTunnel) Done() <-chan struct{} { return t.done }
 
 // FindBinary looks for cloudflared next to our executable, then in PATH.
 func FindBinary() (string, error) {
@@ -44,7 +49,7 @@ func FindBinary() (string, error) {
 
 // StartQuick runs `cloudflared tunnel --url <local>` and waits until the tunnel
 // is both allocated (URL printed) and registered with the edge.
-func StartQuick(ctx context.Context, bin, local string) (*Tunnel, error) {
+func StartQuick(ctx context.Context, bin, local string) (*CloudflaredTunnel, error) {
 	cmd := exec.CommandContext(ctx, bin, "tunnel", "--no-autoupdate", "--url", local)
 	hideWindow(cmd)
 	stderr, err := cmd.StderrPipe()
@@ -87,7 +92,9 @@ func StartQuick(ctx context.Context, bin, local string) (*Tunnel, error) {
 			_ = cmd.Wait()
 			return nil, r.err
 		}
-		return &Tunnel{URL: r.url, cmd: cmd}, nil
+		t := &CloudflaredTunnel{url: r.url, cmd: cmd, done: make(chan struct{})}
+		go func() { _ = cmd.Wait(); close(t.done) }() // cloudflared exited: tunnel down
+		return t, nil
 	case <-time.After(45 * time.Second):
 		_ = cmd.Process.Kill()
 		return nil, errors.New("timeout waiting for cloudflared tunnel")
@@ -96,9 +103,9 @@ func StartQuick(ctx context.Context, bin, local string) (*Tunnel, error) {
 	}
 }
 
-func (t *Tunnel) Stop() {
+func (t *CloudflaredTunnel) Stop() {
 	if t.cmd.Process != nil {
 		_ = t.cmd.Process.Kill()
-		_ = t.cmd.Wait()
 	}
+	<-t.done
 }

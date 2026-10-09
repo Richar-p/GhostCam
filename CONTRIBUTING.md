@@ -92,7 +92,7 @@ release must follow these rules:
 2. `docker compose run --rm build-release` builds every binary and
    `SHA256SUMS.txt` in `dist/`.
 3. Publish a GitHub release tagged `vX.Y.Z` (not a draft, not a pre-release),
-   with the files **named exactly** `ghostcam.exe`,
+   with the files **named exactly** `ghostcam.exe`, `ghostcam-cli.exe`,
    `ghostcam-macos-apple-silicon`, `ghostcam-macos-intel`, `ghostcam-linux-x64`
    and `ghostcam-linux-arm64`: installed versions look for these names.
 4. Once published, the update is offered to every running copy within 6 hours.

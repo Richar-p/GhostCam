@@ -21,11 +21,12 @@ build() { # GOOS GOARCH output [extra ldflags]
   GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$V ${4:-}" -o "/out/$3" ./cmd/ghostcam
 }
 build windows amd64 ghostcam.exe -H=windowsgui
+build windows amd64 ghostcam-cli.exe -X=main.flavor=cli # console build: commands in a terminal
 build darwin  arm64 ghostcam-macos-apple-silicon
 build darwin  amd64 ghostcam-macos-intel
 build linux   amd64 ghostcam-linux-x64
 build linux   arm64 ghostcam-linux-arm64
 
 cd /out
-sha256sum ghostcam.exe ghostcam-macos-* ghostcam-linux-x64 ghostcam-linux-arm64 > SHA256SUMS.txt
+sha256sum ghostcam.exe ghostcam-cli.exe ghostcam-macos-* ghostcam-linux-x64 ghostcam-linux-arm64 > SHA256SUMS.txt
 ls -lh ghostcam* SHA256SUMS.txt

@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -22,7 +23,7 @@ import (
 	"syscall"
 	"time"
 
-	qrcode "github.com/skip2/go-qrcode"
+	"golang.org/x/term"
 
 	"ghostcam/internal/server"
 	"ghostcam/internal/tunnel"
@@ -40,25 +41,28 @@ var version = "dev"
 // How often a running GhostCam looks for a new release.
 const updateEvery = 6 * time.Hour
 
-func main() {
+// app runs GhostCam until it is closed (window, Ctrl+C or update restart).
+func app(args []string, ui uiMode) {
+	flags := flag.NewFlagSet("ghostcam run", flag.ExitOnError)
 	var (
-		listen    = flag.String("listen", "127.0.0.1:8080", "public HTTP listener (tunnel target, keep on loopback)")
-		admin     = flag.String("admin", "127.0.0.1:8081", "local admin UI listener (never exposed)")
-		rtcPort   = flag.Int("rtc-port", 50000, "UDP port for WebRTC media (mapped with UPnP)")
-		outDir    = flag.String("out", "", "recordings directory (overrides the saved setting)")
-		publicURL = flag.String("public-url", "", "use this HTTPS base URL instead of starting a Cloudflare quick tunnel")
-		cfBin     = flag.String("cloudflared", "", "path to cloudflared (default: downloaded and kept up to date automatically)")
-		stun      = flag.String("stun", "stun:stun.cloudflare.com:3478,stun:stun.l.google.com:19302", "comma-separated STUN URLs (empty to disable)")
-		turnURL   = flag.String("turn", os.Getenv("GHOSTCAM_TURN_URL"), "TURN URL, e.g. turns:turn.example.org:5349 (env GHOSTCAM_TURN_URL)")
-		turnUser  = flag.String("turn-user", os.Getenv("GHOSTCAM_TURN_USER"), "TURN username (env GHOSTCAM_TURN_USER)")
-		noUPnP    = flag.Bool("no-upnp", false, "do not try to open the UDP port on the router")
-		headless  = flag.Bool("headless", false, "no window: print the QR code in the terminal (servers, Docker)")
-		webDir    = flag.String("web-dir", "", "serve web assets from this directory (dev live edit)")
-		waitPID   = flag.Int(update.WaitPIDFlag, 0, "internal: wait for this process to exit first (set when restarting after an update)")
-		updAPI    = flag.String("update-api", "", "internal, tests: releases API URL")
-		updPrefix = flag.String("update-prefix", "", "internal, tests: allowed download URL prefix")
+		listen     = flags.String("listen", "127.0.0.1:8080", "public HTTP listener (tunnel target, keep on loopback)")
+		admin      = flags.String("admin", "127.0.0.1:8081", "local admin UI listener (never exposed)")
+		rtcPort    = flags.Int("rtc-port", 50000, "UDP port for WebRTC media (mapped with UPnP)")
+		outDir     = flags.String("out", "", "recordings directory (overrides the saved setting)")
+		publicURL  = flags.String("public-url", "", "use this HTTPS base URL instead of starting a Cloudflare quick tunnel")
+		cfBin      = flags.String("cloudflared", "", "path to cloudflared (default: downloaded and kept up to date automatically)")
+		tunnelFlag = flags.String("tunnel", "", "tunnel provider for this run: cloudflare, localhostrun (default: the saved setting)")
+		stun       = flags.String("stun", "stun:stun.cloudflare.com:3478,stun:stun.l.google.com:19302", "comma-separated STUN URLs (empty to disable)")
+		turnURL    = flags.String("turn", os.Getenv("GHOSTCAM_TURN_URL"), "TURN URL, e.g. turns:turn.example.org:5349 (env GHOSTCAM_TURN_URL)")
+		turnUser   = flags.String("turn-user", os.Getenv("GHOSTCAM_TURN_USER"), "TURN username (env GHOSTCAM_TURN_USER)")
+		noUPnP     = flags.Bool("no-upnp", false, "do not try to open the UDP port on the router")
+		headless   = flags.Bool("headless", false, "no window: QR code and status in the terminal (same as ghostcam run)")
+		webDir     = flags.String("web-dir", "", "serve web assets from this directory (dev live edit)")
+		waitPID    = flags.Int(update.WaitPIDFlag, 0, "internal: wait for this process to exit first (set when restarting after an update)")
+		updAPI     = flags.String("update-api", "", "internal, tests: releases API URL")
+		updPrefix  = flags.String("update-prefix", "", "internal, tests: allowed download URL prefix")
 	)
-	flag.Parse()
+	_ = flags.Parse(args)
 
 	// After an update, the previous instance is still closing its recordings
 	// and releasing its ports: wait for it before doing anything.
@@ -108,6 +112,7 @@ func main() {
 
 	// ------------------------------------------------------------ updates
 	upd := update.ForRepo(ghostcam.Repo)
+	upd.CLI = flavor == "cli"
 	if *updAPI != "" {
 		upd.API, upd.Prefix = *updAPI, *updPrefix
 	}
@@ -234,44 +239,29 @@ func main() {
 			default:
 			}
 		}()
-		base := *publicURL
-		if base == "" {
-			t, errKey, err := startTunnel(ctx, *cfBin, *listen, filepath.Join(dataDir, "bin"), srv.SetProgress)
-			if err != nil {
-				srv.SetError(errKey, err, nil)
-				<-ctx.Done()
-				return
-			}
-			defer t.Stop()
-			base = t.URL
-			// A fresh quick-tunnel hostname can take a few seconds to resolve:
-			// show the QR code only once the phone can actually reach it.
-			srv.SetProgress("progress.publicCheck", nil)
-			waitReachable(ctx, base, 30*time.Second)
-		}
-		srv.SetPublicURL(base)
-		log.Printf("public URL: %s", base)
 		log.Printf("recordings: %s", settings.OutDir)
-		if *headless {
-			if q, err := qrcode.New(srv.PairingURL(), qrcode.Medium); err == nil {
-				fmt.Println(q.ToSmallString(false))
-			}
-		}
-		<-ctx.Done()
+		runTunnels(ctx, srv, tunnelOpts{
+			forceURL: *publicURL, forceProvider: *tunnelFlag, cfBin: *cfBin, listen: *listen,
+			binDir: filepath.Join(dataDir, "bin"), knownHosts: filepath.Join(dataDir, "known_hosts"),
+		})
 	}()
 
 	adminURL := "http://localhost:" + (*admin)[strings.LastIndex(*admin, ":")+1:] + "/"
 	log.Printf("admin UI: %s", adminURL)
+	if *headless {
+		ui = uiTerminal
+	}
+	tr := newTranslator(settings.Language)
 	switch {
-	case *headless:
-		<-ctx.Done()
-	case runWindow(ctx, adminURL, filepath.Join(dataDir, "webview")):
+	case ui == uiWindow && runWindow(ctx, adminURL, filepath.Join(dataDir, "webview")):
 		// window closed by the user
+	case ui == uiTerminal:
+		terminalUI(ctx, srv, tr, adminURL)
 	default:
-		// No native window (macOS, Linux): the same page opens in the browser.
+		// No native window (macOS, Linux, or no WebView2): the same page opens
+		// in the browser, the terminal shows the QR code and status too.
 		_ = openPath(adminURL)
-		fmt.Printf("\nGhostCam is running. Open %s in your browser if it didn't open.\nVideos: %s\nPress Ctrl+C to quit.\n\n", adminURL, settings.OutDir)
-		<-ctx.Done()
+		terminalUI(ctx, srv, tr, adminURL)
 	}
 
 	log.Printf("shutting down…")
@@ -286,11 +276,121 @@ func main() {
 	}
 }
 
+type tunnelOpts struct {
+	forceURL      string // -public-url: the user's own address, overrides the setting
+	forceProvider string // -tunnel
+	cfBin         string
+	listen        string // local server the tunnel forwards to
+	binDir        string // managed cloudflared
+	knownHosts    string // localhost.run host key (trust on first use)
+}
+
+// runTunnels keeps the phone page reachable from the Internet until ctx ends:
+// it opens the chosen provider, reconnects when the tunnel drops, and
+// switches when the setting changes. Each new URL means a new QR code.
+func runTunnels(ctx context.Context, srv *server.Server, o tunnelOpts) {
+	current := func() (string, string) {
+		if o.forceURL != "" {
+			return tunnel.Custom, o.forceURL
+		}
+		set := srv.CurrentSettings()
+		if o.forceProvider != "" {
+			return o.forceProvider, set.TunnelURL
+		}
+		return set.Tunnel, set.TunnelURL
+	}
+	// changed waits up to d (forever if 0) for the setting to change.
+	changed := func(provider, custom string, d time.Duration, down <-chan struct{}) bool {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		var timeout <-chan time.Time
+		if d > 0 {
+			timeout = time.After(d)
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return false
+			case <-down:
+				return false
+			case <-timeout:
+				return false
+			case <-tick.C:
+				if p, c := current(); p != provider || c != custom {
+					return true
+				}
+			}
+		}
+	}
+	for ctx.Err() == nil {
+		provider, custom := current()
+		srv.SetPublicURL("")
+		t, errKey, err := openTunnel(ctx, provider, custom, o, srv.SetProgress)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			srv.SetError(errKey, err, nil)
+			changed(provider, custom, 30*time.Second, nil) // retry, sooner if the setting changes
+			srv.ClearError()
+			continue
+		}
+		srv.ClearError()
+		if provider != tunnel.Custom {
+			// A fresh hostname can take a few seconds to resolve: show the QR
+			// code only once the phone can actually reach it.
+			srv.SetProgress("progress.publicCheck", nil)
+			waitReachable(ctx, t.URL(), 30*time.Second)
+		}
+		srv.SetPublicURL(t.URL())
+		log.Printf("public URL (%s): %s", provider, t.URL())
+		switched := changed(provider, custom, 0, t.Done())
+		t.Stop()
+		if ctx.Err() != nil {
+			return
+		}
+		if !switched {
+			log.Printf("tunnel %s lost, reconnecting", provider)
+			srv.SetProgress("progress.tunnelLost", nil)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(3 * time.Second):
+			}
+		}
+	}
+}
+
+// openTunnel starts one provider. On failure it returns the translation key
+// of the error to show.
+func openTunnel(ctx context.Context, provider, custom string, o tunnelOpts, progress tunnel.Progress) (tunnel.Tunnel, string, error) {
+	switch provider {
+	case tunnel.Custom:
+		if custom == "" {
+			return nil, "error.tunnelURL", errors.New("no custom address set")
+		}
+		return tunnel.NewStatic(strings.TrimRight(custom, "/")), "", nil
+	case tunnel.LocalhostRun:
+		progress("progress.tunnel", nil)
+		t, err := tunnel.StartLocalhostRun(ctx, tunnel.LocalhostRunAddr, o.listen, o.knownHosts)
+		if err != nil {
+			return nil, "error.tunnel", err
+		}
+		return t, "", nil
+	default:
+		t, key, err := startTunnel(ctx, o.cfBin, o.listen, o.binDir, progress)
+		if err != nil {
+			return nil, key, err
+		}
+		return t, "", nil
+	}
+}
+
 // startTunnel uses -cloudflared if given; otherwise a managed copy in the app
 // data folder, downloaded and updated automatically (single-file install).
 // A cloudflared next to the exe or in PATH is only a fallback.
 // On failure it returns the translation key of the error to show.
-func startTunnel(ctx context.Context, bin, listen, binDir string, progress tunnel.Progress) (*tunnel.Tunnel, string, error) {
+func startTunnel(ctx context.Context, bin, listen, binDir string, progress tunnel.Progress) (*tunnel.CloudflaredTunnel, string, error) {
 	if bin == "" {
 		var err error
 		if bin, err = tunnel.Ensure(ctx, binDir, progress); err != nil {
@@ -379,9 +479,15 @@ func appDataDir() string {
 }
 
 // The Windows build has no console, so logs also go to a file.
+// In a terminal showing the live status, logs go to the file only (they
+// would break the display); otherwise (Docker, redirected output) to stderr too.
 func setupLog(dir string) {
 	f, err := os.OpenFile(filepath.Join(dir, "ghostcam.log"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
+		return
+	}
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		log.SetOutput(f)
 		return
 	}
 	log.SetOutput(io.MultiWriter(os.Stderr, f))

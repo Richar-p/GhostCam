@@ -18,6 +18,7 @@ const DYNAMIC = {
   'pc.quality.${q.id}.risk': ['eco', 'standard', 'high', 'max'],
   'phone.mode.${tr.kind}': ['direct', 'relay'],
   'pc.quality.${lower.id}.label': ['eco', 'standard', 'high', 'max'],
+  'pc.tunnel.${v}': ['cloudflare', 'localhostrun', 'custom'],
 };
 
 let errors = 0, warnings = 0;

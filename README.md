@@ -22,7 +22,7 @@
 
 **1. On your computer:** download GhostCam and open it.
 
-- **Windows 10/11:** [`ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe). If SmartScreen says the app is unrecognized, click *More info → Run anyway*. When the firewall asks, click *Allow*.
+- **Windows 10/11:** [`ghostcam.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam.exe) (or [`ghostcam-cli.exe`](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-cli.exe) for the [command line](#command-line)). If SmartScreen says the app is unrecognized, click *More info → Run anyway*. When the firewall asks, click *Allow*.
 - **macOS** *(experimental)*: [Apple Silicon (M1 and later)](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-macos-apple-silicon) or [Intel](https://github.com/p3374/GhostCam/releases/latest/download/ghostcam-macos-intel). Then, in Terminal:
   ```sh
   cd ~/Downloads && chmod +x ghostcam-macos-* && xattr -c ghostcam-macos-* && ./ghostcam-macos-apple-silicon
@@ -148,6 +148,37 @@ official GitHub releases and installs or updates its own copy in
 
 `-cloudflared <path>` skips all of this and uses your own binary.
 
+## Command line
+
+Every GhostCam binary is also a command-line tool (on Windows, use
+`ghostcam-cli.exe`, since `ghostcam.exe` is a window app):
+
+| Command | What it does |
+|---|---|
+| `ghostcam run` | Start in the terminal: QR code and live status (waiting, connected, ● REC, size, delay) |
+| `ghostcam config` | Show the settings |
+| `ghostcam config set KEY VALUE` | Change a setting, applied at once if GhostCam is running. Keys: `quality`, `buffer`, `out`, `tunnel`, `tunnel-url`, `language`, `updates` |
+| `ghostcam config get KEY` | Show one setting |
+| `ghostcam update [--check]` | Install the latest version (`--check`: only look) |
+| `ghostcam version` | Show the version |
+
+The terminal speaks the same languages as the window (same translation
+files). With redirected output (logs, Docker), it prints one line per change.
+
+## Internet link (tunnel)
+
+The phone reaches the computer through a public HTTPS address. In Settings →
+*Internet link* (or `ghostcam config set tunnel …`):
+
+| Choice | How it works |
+|---|---|
+| **Cloudflare** (default) | Cloudflare Quick Tunnel: no account; `cloudflared` is downloaded, verified and updated automatically |
+| **localhost.run** | SSH tunnel built into GhostCam: nothing to download, no account. The free address changes more often, and the server's SSH key is pinned on first use |
+| **My own address** | Any HTTPS URL you control that forwards to `127.0.0.1:8080` on this computer: ngrok, Tailscale Funnel, a Cloudflare named tunnel, Caddy or nginx on your own server… |
+
+Changing the link restarts it at once, with a new QR code. If the tunnel drops,
+GhostCam reconnects by itself.
+
 ## Updates
 
 GhostCam checks the latest GitHub release at startup and then every 6 hours.
@@ -253,11 +284,12 @@ Docker, only the encrypted relay (and sometimes STUN) works.
 | `-out <dir>` | saved setting | Recordings folder (overrides the setting) |
 | `-rtc-port <n>` | `50000` | UDP port for WebRTC (mapped with UPnP) |
 | `-no-upnp` | off | Do not touch the router |
-| `-public-url <https-url>` | Quick Tunnel | Use your own reverse proxy or named tunnel instead |
+| `-tunnel <provider>` | saved setting | `cloudflare` or `localhostrun` for this run |
+| `-public-url <https-url>` | saved setting | Your own address for this run (see [Internet link](#internet-link-tunnel)) |
 | `-cloudflared <path>` | auto-downloaded and updated | Use this cloudflared binary instead |
 | `-stun <urls>` | Cloudflare + Google | Comma-separated STUN servers; empty disables STUN |
 | `-turn <url> -turn-user <u>` | none | TURN server; password via `GHOSTCAM_TURN_PASS` |
-| `-headless` | off | No window: print the QR code in the terminal |
+| `-headless` | off | No window: QR code and status in the terminal (same as `ghostcam run`) |
 | `-web-dir <dir>` | embedded | Serve `web/` from disk (live editing) |
 
 Logs are written to `%LOCALAPPDATA%\GhostCam\ghostcam.log`.
@@ -303,11 +335,11 @@ and last frames.
 ## Project layout
 
 ```
-cmd/ghostcam/        entry point: flags, tunnel, UPnP, settings; native window + folder picker (gui_windows.go)
+cmd/ghostcam/        entry point: subcommands (cli.go), terminal UI (term.go), tunnels, UPnP, updates; native window (gui_windows.go)
 internal/server/     HTTP (public + admin), WebSocket signaling, WebRTC session, encrypted relay, settings
 internal/record/     fsync'ed append-only file, live WebM muxer
 internal/pairing/    pairing secret, HMAC auth, AES-GCM frame decryption
-internal/tunnel/     cloudflared Quick Tunnel
+internal/tunnel/     tunnels: cloudflared Quick Tunnel, localhost.run (SSH, built in), custom URL
 internal/upnp/       router port mapping + lease renewal
 internal/update/     self-update: release check, verified download, binary swap, restart
 web/                 phone page (index.html, app.js), PC window (admin.html), i18n.js, icon (embedded in the binary)

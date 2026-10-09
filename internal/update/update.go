@@ -40,6 +40,7 @@ type Updater struct {
 	API    string // https://api.github.com/repos/<owner>/<repo>/releases/latest
 	Prefix string // assets must be downloaded from here: https://github.com/<owner>/<repo>/releases/download/
 	Client *http.Client
+	CLI    bool // Windows console build: updates ghostcam-cli.exe
 }
 
 // ForRepo returns an Updater for a https://github.com/<owner>/<repo> URL.
@@ -53,9 +54,14 @@ func ForRepo(repo string) *Updater {
 }
 
 // AssetName is the release file for this platform (see scripts/build-release.sh).
-func AssetName(goos, goarch string) string {
+// On Windows the console build (cli) is a separate file; elsewhere one binary
+// does both.
+func AssetName(goos, goarch string, cli bool) string {
 	switch goos + "/" + goarch {
 	case "windows/amd64":
+		if cli {
+			return "ghostcam-cli.exe"
+		}
 		return "ghostcam.exe"
 	case "darwin/arm64":
 		return "ghostcam-macos-apple-silicon"
@@ -71,7 +77,7 @@ func AssetName(goos, goarch string) string {
 
 // Check returns the latest release if it is newer than current, nil otherwise.
 func (u *Updater) Check(ctx context.Context, current string) (*Release, error) {
-	asset := AssetName(runtime.GOOS, runtime.GOARCH)
+	asset := AssetName(runtime.GOOS, runtime.GOARCH, u.CLI)
 	if asset == "" {
 		return nil, fmt.Errorf("no release binary for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
